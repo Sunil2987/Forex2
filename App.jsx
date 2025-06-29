@@ -7,9 +7,7 @@ const TICKERS = [
   { symbol: 'XAU/USD', key: 'XAU/USD' },
   { symbol: 'GBP/CAD', key: 'GBP/CAD' },
   { symbol: 'USD/JPY', key: 'USD/JPY' },
-  { symbol: 'GBP/USD', key: 'GBP/USD' },
-  { symbol: 'AUD/USD', key: 'AUD/USD' }
-];
+   ];
 
 export default function App() {
   const [rows, setRows] = useState([]);
