@@ -30,20 +30,34 @@ const getATRScale = (atr) => {
 function App() {
   const [data, setData] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState({ current: 0, total: TICKERS.length });
 
   useEffect(() => {
     document.body.className = darkMode ? 'dark' : '';
   }, [darkMode]);
 
   const fetchData = async () => {
+    setLoading(true);
+    setError(null);
     const updatedData = [];
+    
     for (let i = 0; i < TICKERS.length; i++) {
       const { from, to } = TICKERS[i];
+      setProgress({ current: i + 1, total: TICKERS.length });
+      
       try {
         const priceRes = await fetch(
           `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${from}&to_currency=${to}&apikey=${API_KEY}`
         );
         const priceJson = await priceRes.json();
+        
+        // Check for API errors
+        if (priceJson['Error Message'] || priceJson['Note']) {
+          throw new Error(priceJson['Error Message'] || 'API rate limit exceeded');
+        }
+        
         const priceData = priceJson['Realtime Currency Exchange Rate'];
         const price = parseFloat(priceData?.['5. Exchange Rate'] || 0);
         const change = parseFloat(priceData?.['10. Change Percent'] || 0);
@@ -71,10 +85,15 @@ function App() {
         });
       } catch (err) {
         console.error(`Error for ${from}/${to}:`, err);
+        setError(`Failed to fetch data for ${from}/${to}: ${err.message}`);
       }
-      if (i < TICKERS.length - 1) await new Promise(r => setTimeout(r, 15000));
+      
+      // Reduced delay from 15 seconds to 2 seconds
+      if (i < TICKERS.length - 1) await new Promise(r => setTimeout(r, 2000));
     }
+    
     setData(updatedData);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -82,6 +101,60 @@ function App() {
     const interval = setInterval(fetchData, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  if (loading) {
+    return (
+      <div className="app">
+        <button className="toggle-btn" onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+        <h1 className="header">Forex Volatility Monitor</h1>
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <h2>Loading forex data...</h2>
+          <p>Fetching {progress.current} of {progress.total} currency pairs</p>
+          <div style={{ 
+            width: '100%', 
+            backgroundColor: '#ddd', 
+            borderRadius: '4px',
+            margin: '1rem 0'
+          }}>
+            <div style={{
+              width: `${(progress.current / progress.total) * 100}%`,
+              height: '20px',
+              backgroundColor: '#4caf50',
+              borderRadius: '4px',
+              transition: 'width 0.3s ease'
+            }}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="app">
+        <button className="toggle-btn" onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+        <h1 className="header">Forex Volatility Monitor</h1>
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <h2>Error Loading Data</h2>
+          <p>{error}</p>
+          <button onClick={fetchData} style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#4caf50', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
