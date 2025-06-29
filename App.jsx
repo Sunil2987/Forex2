@@ -50,14 +50,14 @@ export default function App() {
           const priceJson = await priceRes.json();
           if (priceJson.status === 'error') throw new Error(priceJson.message);
 
-          const atrRes = await fetch(`https://api.twelvedata.com/atr?symbol=${symbol}&interval=1h&time_period=14&apikey=${API_KEY}`);
+          const atrRes = await fetch(`https://api.twelvedata.com/atr?symbol=${symbol}&interval=1day&time_period=14&apikey=${API_KEY}`);
           const atrJson = await atrRes.json();
           if (atrJson.status === 'error') throw new Error(atrJson.message);
 
           const price = parseFloat(priceJson.price);
           const atr = parseFloat(atrJson.values?.[0]?.atr ?? 0);
           const atrPercent = price ? (atr / price) * 100 : 0;
-          const bulbs = atrPercent >= 1.5 ? 5 : Math.max(1, Math.round((atrPercent / 1.5) * 5));
+          const bulbs = atrPercent >= 1.5 ? 5 : Math.max(1, Math.round((atrPercent / 1.5 ) * 5));
 
           return {
             symbol: key,
