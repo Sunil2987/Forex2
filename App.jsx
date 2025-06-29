@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 
 const API_KEY = 'ca4cbc17c9524d5182b781c1e71ff6d5'; // Twelve Data API key
 const BOT_TOKEN = '7682738545:AAEuqIzjzBr56AkT-dwuoZK_1bxjBqcMv00'; // Telegram Bot Token
-const CHAT_ID = '573040944'; // Your Telegram Chat ID
+const CHAT_ID = '573040944'; // Telegram Chat ID
 
 const TICKERS = [
   { symbol: 'BTC/USD', key: 'BTC/USD' },
@@ -57,7 +57,7 @@ export default function App() {
           const price = parseFloat(priceJson.price);
           const atr = parseFloat(atrJson.values?.[0]?.atr ?? 0);
           const atrPercent = price ? (atr / price) * 100 : 0;
-          const bulbs = atrPercent >= 5 ? 5 : Math.max(1, Math.round((atrPercent / 5 ) * 5));
+          const bulbs = atrPercent >= 5 ? 5 : Math.max(1, Math.round((atrPercent / 5) * 5));
 
           return {
             symbol: key,
@@ -71,7 +71,7 @@ export default function App() {
       results.sort((a, b) => b.atrPercent - a.atrPercent);
       setRows(results);
 
-      const triggered = results.filter(r => r.atrPercent >= 1.5);
+      const triggered = results.filter(r => r.atrPercent >= 5); // Updated threshold to 5%
       if (triggered.length > 0) {
         const msg = '⚠️ High Volatility Alert:\n' + triggered.map(r => `${r.symbol}: ${r.atrPercent.toFixed(2)}%`).join('\n');
         audioRef.current?.play().catch(() => {});
@@ -135,7 +135,7 @@ export default function App() {
                     {r.atrPercent.toFixed(2)}%
                     {r.atrPercent >= 5 && <span className="threshold-hit"> / 5%</span>}
                   </td>
-                  <td>{bulbs(r.bulbs, r.atrPercent >= 5}</td>
+                  <td>{bulbs(r.bulbs, r.atrPercent >= 5)}</td>
                 </tr>
               ))}
             </tbody>
