@@ -1,21 +1,86 @@
-body { margin: 0; font-family: Arial, sans-serif; background: #f2f2f2; }
-body.dark { background: #121212; color: #eee; }
-.dark .card { background: #1e1e1e; color: #eee; }
-.app { max-width: 640px; margin: auto; padding: 1rem; }
-.header { text-align: center; margin-bottom: 1rem; }
-.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-.card { background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); padding: 0.8rem; }
-.card h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
-.low { border-left: 6px solid #4caf50; }
-.medium { border-left: 6px solid #ffeb3b; }
-.high { border-left: 6px solid #ff9800; }
-.danger { border-left: 6px solid #f44336; }
-.toggle-btn {
-  position: absolute; top: 10px; right: 10px;
-  padding: 6px 12px; font-size: 0.9rem;
-  border: none; background: #444; color: white;
-  border-radius: 8px; cursor: pointer;
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0d0d0d;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #eaeaea;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
 }
-@media (max-width: 480px) {
-  .card-grid { grid-template-columns: 1fr; }
+
+.app {
+  background: rgba(20, 20, 20, 0.95);
+  padding: 2rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 0 15px rgba(0, 255, 200, 0.2);
+  backdrop-filter: blur(10px);
+  width: 95%;
+  max-width: 700px;
+}
+
+.header {
+  text-align: center;
+  color: #00ffcc;
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.refresh-btn {
+  display: block;
+  margin: 0 auto 1rem;
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  background-color: #00ffcc;
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+.refresh-btn:hover {
+  background-color: #00e6b8;
+}
+
+.countdown {
+  text-align: center;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: #aaa;
+}
+
+.loading,
+.error {
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 1rem;
+}
+
+.volatility-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.volatility-table th,
+.volatility-table td {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid #222;
+}
+
+.volatility-table th {
+  background-color: #111;
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+.alert-row {
+  background-color: rgba(255, 0, 0, 0.15);
+  font-weight: bold;
+  color: #ff5f5f;
 }
