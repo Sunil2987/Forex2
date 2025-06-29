@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const API_KEY = 'ca4cbc17c9524d5182b781c1e71ff6d5';
+const API_KEY = 'ca4cbc17c9524d5182b781c1e71ff6d5';  // Your Twelve Data API key
 
 const TICKERS = [
   { symbol: 'BTC/USD', key: 'BTC/USD' },
@@ -10,8 +10,6 @@ const TICKERS = [
   { symbol: 'GBP/USD', key: 'GBP/USD' },
   { symbol: 'AUD/USD', key: 'AUD/USD' }
 ];
-
-const formatSymbol = (s) => s.replace('/', '');
 
 export default function App() {
   const [rows, setRows] = useState([]);
@@ -39,13 +37,13 @@ export default function App() {
       const results = await Promise.all(
         TICKERS.map(async ({ symbol, key }) => {
           const priceRes = await fetch(
-            `https://api.twelvedata.com/price?symbol=${formatSymbol(symbol)}&apikey=${API_KEY}`
+            `https://api.twelvedata.com/price?symbol=${symbol}&apikey=${API_KEY}`
           );
           const priceJson = await priceRes.json();
           if (priceJson.status === 'error') throw new Error(priceJson.message);
 
           const atrRes = await fetch(
-            `https://api.twelvedata.com/atr?symbol=${formatSymbol(symbol)}&interval=1h&time_period=14&apikey=${API_KEY}`
+            `https://api.twelvedata.com/atr?symbol=${symbol}&interval=1h&time_period=14&apikey=${API_KEY}`
           );
           const atrJson = await atrRes.json();
           if (atrJson.status === 'error') throw new Error(atrJson.message);
