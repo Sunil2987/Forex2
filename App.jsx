@@ -1,91 +1,206 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
+import React, { useState, useEffect, useRef } from 'react';
+
+const API_KEY = 'ca4cbc17c9524d5182b781c1e71ff6d5';
 
 const TICKERS = [
-  { symbol: 'EURUSD=X', label: 'EUR/USD' },
-  { symbol: 'USDJPY=X', label: 'USD/JPY' },
-  { symbol: 'AUDUSD=X', label: 'AUD/USD' },
-  { symbol: 'GBPUSD=X', label: 'GBP/USD' },
-  { symbol: 'USDCAD=X', label: 'USD/CAD' },
-  { symbol: 'NZDUSD=X', label: 'NZD/USD' },
-  { symbol: 'USDCHF=X', label: 'USD/CHF' },
-  { symbol: 'EURJPY=X', label: 'EUR/JPY' },
-  { symbol: 'GBPJPY=X', label: 'GBP/JPY' },
+  { symbol: 'BTC/USD', key: 'BTC/USD' },
+  { symbol: 'XAU/USD', key: 'XAU/USD' },
+  { symbol: 'GBP/CAD', key: 'GBP/CAD' },
+  { symbol: 'USD/JPY', key: 'USD/JPY' },
+  { symbol: 'GBP/USD', key: 'GBP/USD' },
+  { symbol: 'AUD/USD', key: 'AUD/USD' },
 ];
 
-function getATRScale(range) {
-  if (range >= 1.5) return 10;
-  if (range >= 1.2) return 9;
-  if (range >= 1.0) return 8;
-  if (range >= 0.8) return 7;
-  if (range >= 0.6) return 6;
-  if (range >= 0.4) return 5;
-  if (range >= 0.3) return 4;
-  if (range >= 0.2) return 3;
-  if (range >= 0.1) return 2;
-  return 1;
-}
+// Format symbol for API (remove slash)
+const formatSymbol = (symbol) => symbol.replace('/', '');
 
 function App() {
   const [data, setData] = useState([]);
-  const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
+  const [countdown, setCountdown] = useState(300); // 5 min
+  const countdownRef = useRef(null);
+  const soundRef = useRef(null);
 
-  useEffect(() => {
-    document.body.className = darkMode ? 'dark' : '';
-  }, [darkMode]);
-
+  // Fetch data for all tickers
   const fetchData = async () => {
     setLoading(true);
+    setError('');
     try {
-      const symbols = TICKERS.map(t => t.symbol).join(',');
-      const res = await fetch(`https://corsproxy.io/?https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`);
-      const json = await res.json();
-      const quotes = json.quoteResponse.result;
+      const results = await Promise.all(
+        TICKERS.map(async ({ symbol, key }) => {
+          const priceRes = await fetch(
+            `https://api.twelvedata.com/price?symbol=${formatSymbol(symbol)}&apikey=${API_KEY}`
+          );
+          const priceJson = await priceRes.json();
+          if (priceJson.status === 'error') throw new Error(priceJson.message);
 
-      const mappedData = quotes.map((q, i) => {
-        const price = q.regularMarketPrice;
-        const change = q.regularMarketChangePercent;
-        const range = q.regularMarketDayHigh - q.regularMarketDayLow;
-        const atrScale = getATRScale(range);
-        const support = (price * 0.995).toFixed(4);
-        const resistance = (price * 1.005).toFixed(4);
+          const atrRes = await fetch(
+            `https://api.twelvedata.com/atr?symbol=${formatSymbol(symbol)}&interval=1h&time_period=14&apikey=${API_KEY}`
+          );
+          const atrJson = await atrRes.json();
+          if (atrJson.status === 'error') throw new Error(atrJson.message);
 
-        return {
-          ticker: TICKERS[i].label,
-          price,
-          change,
-          atrScale,
-          support,
-          resistance
-        };
-      });
+          const price = parseFloat(priceJson.price);
+          const atr = parseFloat(atrJson.values?.[0]?.atr || 0);
+          const atrPercent = price > 0 ? (atr / price) * 100 : 0;
 
-      setData(mappedData);
+          // Scale ATR % between 1 and 10 bulbs (1=0%, 10=100%)
+          let bulbCount = Math.min(10, Math.max(1, Math.round((atrPercent / 100) * 10)));
+
+          // Support & resistance
+          const support = (price - atr).toFixed(4);
+          const resistance = (price + atr).toFixed(4);
+
+          return {
+            symbol: key,
+            price: price.toFixed(4),
+            atrPercent,
+            bulbCount,
+            support,
+            resistance,
+          };
+        })
+      );
+
+      // Sort descending by volatility
+      results.sort((a, b) => b.atrPercent - a.atrPercent);
+      setData(results);
+      setLoading(false);
+
+      // Play sound if volatility > 60%
+      if (results.some((r) => r.atrPercent > 60)) {
+        if (soundRef.current) {
+          soundRef.current.play().catch(() => {});
+        }
+      }
     } catch (err) {
-      console.error(err);
-      setError('Failed to fetch data from Yahoo Finance.');
+      setError(err.message || 'Failed to fetch data');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
+  // Check if refresh allowed (Mon-Fri, 12 PM to 12 AM IST)
+  const isRefreshAllowed = () => {
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const istOffset = 5.5 * 60 * 60000;
+    const ist = new Date(utc + istOffset);
+
+    const hour = ist.getHours();
+    const day = ist.getDay();
+
+    return day >= 1 && day <= 5 && hour >= 12 && hour < 24;
+  };
+
+  // Countdown timer & auto refresh
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10 * 60 * 1000);
-    return () => clearInterval(interval);
+    setCountdown(300);
+
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          if (isRefreshAllowed()) {
+            fetchData();
+            return 300;
+          }
+          return c;
+        }
+        return c - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(countdownRef.current);
   }, []);
 
-  if (loading) return <div className="app"><h2>Loading...</h2></div>;
-  if (error) return <div className="app"><h2>{error}</h2></div>;
+  const formatBulbs = (count) => '💡'.repeat(count);
 
   return (
-    <div className="app">
-      <button className="toggle-btn" onClick={() => setDarkMode(!darkMode)}>
-        {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+    <div style={{ maxWidth: 700, margin: 'auto', padding: 16, fontFamily: 'Arial, sans-serif' }}>
+      <h1 style={{ textAlign: 'center' }}>Forex + BTC Volatility Monitor</h1>
+
+      <button
+        onClick={() => {
+          fetchData();
+          setCountdown(300);
+        }}
+        style={{
+          padding: '10px 20px',
+          marginBottom: 20,
+          cursor: 'pointer',
+          backgroundColor: '#4caf50',
+          color: 'white',
+          border: 'none',
+          borderRadius: 6,
+          display: 'block',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+        }}
+      >
+        Refresh Now
       </button>
-      <h1 className="header">Forex Volatility Monitor</h1>
-      <div className="card-grid">
-        {data.map((row, idx) => (
-          <div key={idx} className={`card ${row.atrScale >= 9 ? 'danger' : row.atrScale >= 7 ? 'high' : row.atrScale >= 4 ? 'medium' : 'low'}`}>
-            <h2>{row.ticker}</h2>
+
+      <p style={{ textAlign: 'center' }}>
+        Next auto-refresh in: <strong>{countdown}s</strong>
+      </p>
+
+      {loading && <p style={{ textAlign: 'center' }}>Loading data...</p>}
+      {error && <p style={{ color: 'red', textAlign: 'center' }}>Error: {error}</p>}
+
+      {!loading && !error && (
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            textAlign: 'center',
+            marginTop: 16,
+          }}
+        >
+          <thead>
+            <tr style={{ borderBottom: '2px solid #ddd' }}>
+              <th>Ticker</th>
+              <th>Price</th>
+              <th>Volatility (%)</th>
+              <th>Bulbs</th>
+              <th>Support</th>
+              <th>Resistance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map(({ symbol, price, atrPercent, bulbCount, support, resistance }) => {
+              const showFire = atrPercent > 60;
+              return (
+                <tr
+                  key={symbol}
+                  style={{
+                    backgroundColor: showFire ? '#fdd' : 'transparent',
+                    fontWeight: showFire ? 'bold' : 'normal',
+                  }}
+                >
+                  <td>
+                    {symbol} {showFire && '🔥'}
+                  </td>
+                  <td>{price}</td>
+                  <td>{atrPercent.toFixed(2)}</td>
+                  <td>{formatBulbs(bulbCount)}</td>
+                  <td>{support}</td>
+                  <td>{resistance}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+
+      {/* Audio for alert */}
+      <audio
+        ref={soundRef}
+        src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
+        preload="auto"
+      ></audio>
+    </div>
+  );
+}
+
+export default App;
