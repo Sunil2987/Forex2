@@ -40,7 +40,7 @@ function App() {
     setLoading(true);
     try {
       const symbols = TICKERS.map(t => t.symbol).join(',');
-      const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`);
+      const res = await fetch(`https://corsproxy.io/?https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`);
       const json = await res.json();
       const quotes = json.quoteResponse.result;
 
@@ -89,16 +89,3 @@ function App() {
         {data.map((row, idx) => (
           <div key={idx} className={`card ${row.atrScale >= 9 ? 'danger' : row.atrScale >= 7 ? 'high' : row.atrScale >= 4 ? 'medium' : 'low'}`}>
             <h2>{row.ticker}</h2>
-            <p><strong>Price:</strong> {row.price.toFixed(4)}</p>
-            <p><strong>Change:</strong> {row.change.toFixed(2)}%</p>
-            <p><strong>Volatility:</strong> {row.atrScale}/10 {row.atrScale >= 9 ? '🔥' : ''}</p>
-            <p><strong>Support:</strong> {row.support}</p>
-            <p><strong>Resistance:</strong> {row.resistance}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export default App;
