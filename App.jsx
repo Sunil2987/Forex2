@@ -57,7 +57,7 @@ export default function App() {
           const price = parseFloat(priceJson.price);
           const atr = parseFloat(atrJson.values?.[0]?.atr ?? 0);
           const atrPercent = price ? (atr / price) * 100 : 0;
-          const bulbs = atrPercent >= 1.5 ? 5 : Math.max(1, Math.round((atrPercent / 1.5 ) * 5));
+          const bulbs = atrPercent >= 5 ? 5 : Math.max(1, Math.round((atrPercent / 5 ) * 5));
 
           return {
             symbol: key,
@@ -128,14 +128,14 @@ export default function App() {
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.symbol} className={r.atrPercent >= 1.5 ? 'alert-row' : ''}>
-                  <td>{r.symbol} {r.atrPercent >= 1.5 && '🔥'}</td>
+                <tr key={r.symbol} className={r.atrPercent >= 6 ? 'alert-row' : ''}>
+                  <td>{r.symbol} {r.atrPercent >= 6 && '🔥'}</td>
                   <td>{r.price}</td>
                   <td>
                     {r.atrPercent.toFixed(2)}%
-                    {r.atrPercent >= 1.5 && <span className="threshold-hit"> / 1.5%</span>}
+                    {r.atrPercent >= 5 && <span className="threshold-hit"> / 5%</span>}
                   </td>
-                  <td>{bulbs(r.bulbs, r.atrPercent >= 1.5)}</td>
+                  <td>{bulbs(r.bulbs, r.atrPercent >= 5}</td>
                 </tr>
               ))}
             </tbody>
