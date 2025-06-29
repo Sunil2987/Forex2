@@ -55,8 +55,7 @@ export default function App() {
             price : price.toFixed(4),
             atrPercent,
             bulbs,
-            support   : (price - atr).toFixed(4),
-            resistance: (price + atr).toFixed(4)
+
           };
         })
       );
@@ -116,8 +115,8 @@ export default function App() {
                 <td>{r.price}</td>
                 <td>{r.atrPercent.toFixed(2)}</td>
                 <td>{bulbs(r.bulbs)}</td>
-                <td>{r.support}</td>
-                <td>{r.resistance}</td>
+                
+                
               </tr>
             ))}
           </tbody>
