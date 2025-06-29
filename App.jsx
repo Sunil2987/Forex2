@@ -8,21 +8,30 @@ const TICKERS = [
   { symbol: 'GBP/CAD', key: 'GBP/CAD' },
   { symbol: 'USD/JPY', key: 'USD/JPY' },
   { symbol: 'GBP/USD', key: 'GBP/USD' },
-  { symbol: 'AUD/USD', key: 'AUD/USD' },
+  { symbol: 'AUD/USD', key: 'AUD/USD' }
 ];
 
-// Format symbol for API (remove slash)
-const formatSymbol = (symbol) => symbol.replace('/', '');
+const formatSymbol = (s) => s.replace('/', '');
 
-function App() {
-  const [data, setData] = useState([]);
+export default function App() {
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [countdown, setCountdown] = useState(300); // 5 min
-  const countdownRef = useRef(null);
-  const soundRef = useRef(null);
+  const [error, setError]   = useState('');
+  const [count, setCount]   = useState(300);   // 5-min countdown
+  const timerRef            = useRef(null);
+  const audioRef            = useRef(null);
 
-  // Fetch data for all tickers
+  // ── time-window helper ───────────────────────────────────────────
+  const refreshAllowed = () => {
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const ist = new Date(utc + 5.5 * 60 * 60000);   // IST = UTC+5:30
+    const h   = ist.getHours();
+    const d   = ist.getDay();                       // 0-Sun … 6-Sat
+    return d >= 1 && d <= 5 && h >= 12 && h < 24;   // Mon-Fri 12:00-23:59
+  };
+
+  // ── fetch logic ──────────────────────────────────────────────────
   const fetchData = async () => {
     setLoading(true);
     setError('');
@@ -41,166 +50,85 @@ function App() {
           const atrJson = await atrRes.json();
           if (atrJson.status === 'error') throw new Error(atrJson.message);
 
-          const price = parseFloat(priceJson.price);
-          const atr = parseFloat(atrJson.values?.[0]?.atr || 0);
-          const atrPercent = price > 0 ? (atr / price) * 100 : 0;
-
-          // Scale ATR % between 1 and 10 bulbs (1=0%, 10=100%)
-          let bulbCount = Math.min(10, Math.max(1, Math.round((atrPercent / 100) * 10)));
-
-          // Support & resistance
-          const support = (price - atr).toFixed(4);
-          const resistance = (price + atr).toFixed(4);
-
+          const price      = parseFloat(priceJson.price);
+          const atr        = parseFloat(atrJson.values?.[0]?.atr ?? 0);
+          const atrPercent = price ? (atr / price) * 100 : 0;
+          const bulbs      = Math.min(10, Math.max(1, Math.round((atrPercent / 100) * 10)));
           return {
             symbol: key,
-            price: price.toFixed(4),
+            price : price.toFixed(4),
             atrPercent,
-            bulbCount,
-            support,
-            resistance,
+            bulbs,
+            support   : (price - atr).toFixed(4),
+            resistance: (price + atr).toFixed(4)
           };
         })
       );
-
-      // Sort descending by volatility
       results.sort((a, b) => b.atrPercent - a.atrPercent);
-      setData(results);
-      setLoading(false);
-
-      // Play sound if volatility > 60%
-      if (results.some((r) => r.atrPercent > 60)) {
-        if (soundRef.current) {
-          soundRef.current.play().catch(() => {});
-        }
-      }
+      setRows(results);
+      if (results.some(r => r.atrPercent > 60)) audioRef.current?.play().catch(() => {});
     } catch (err) {
-      setError(err.message || 'Failed to fetch data');
+      setError(err.message || 'Fetch failed');
+    } finally {
       setLoading(false);
     }
   };
 
-  // Check if refresh allowed (Mon-Fri, 12 PM to 12 AM IST)
-  const isRefreshAllowed = () => {
-    const now = new Date();
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-    const istOffset = 5.5 * 60 * 60000;
-    const ist = new Date(utc + istOffset);
-
-    const hour = ist.getHours();
-    const day = ist.getDay();
-
-    return day >= 1 && day <= 5 && hour >= 12 && hour < 24;
-  };
-
-  // Countdown timer & auto refresh
+  // ── first load & countdown timer ─────────────────────────────────
   useEffect(() => {
     fetchData();
-    setCountdown(300);
-
-    countdownRef.current = setInterval(() => {
-      setCountdown((c) => {
+    timerRef.current = setInterval(() => {
+      setCount((c) => {
         if (c <= 1) {
-          if (isRefreshAllowed()) {
-            fetchData();
-            return 300;
-          }
-          return c;
+          if (refreshAllowed()) { fetchData(); return 300; }
+          return c;   // pause outside window
         }
         return c - 1;
       });
     }, 1000);
-
-    return () => clearInterval(countdownRef.current);
+    return () => clearInterval(timerRef.current);
   }, []);
 
-  const formatBulbs = (count) => '💡'.repeat(count);
+  const bulbs = (n) => '💡'.repeat(n);
 
   return (
-    <div style={{ maxWidth: 700, margin: 'auto', padding: 16, fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ textAlign: 'center' }}>Forex + BTC Volatility Monitor</h1>
+    <div className="app">
+      <h1 className="header">Forex + BTC Volatility Monitor</h1>
 
-      <button
-        onClick={() => {
-          fetchData();
-          setCountdown(300);
-        }}
-        style={{
-          padding: '10px 20px',
-          marginBottom: 20,
-          cursor: 'pointer',
-          backgroundColor: '#4caf50',
-          color: 'white',
-          border: 'none',
-          borderRadius: 6,
-          display: 'block',
-          marginLeft: 'auto',
-          marginRight: 'auto',
-        }}
-      >
+      <button className="refresh-btn" onClick={() => { fetchData(); setCount(300); }}>
         Refresh Now
       </button>
 
-      <p style={{ textAlign: 'center' }}>
-        Next auto-refresh in: <strong>{countdown}s</strong>
+      <p className="countdown">
+        Next auto-refresh in: <strong>{count}s</strong>
       </p>
 
-      {loading && <p style={{ textAlign: 'center' }}>Loading data...</p>}
-      {error && <p style={{ color: 'red', textAlign: 'center' }}>Error: {error}</p>}
+      {loading && <p className="loading">Loading…</p>}
+      {error   && <p className="error">Error: {error}</p>}
 
       {!loading && !error && (
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            textAlign: 'center',
-            marginTop: 16,
-          }}
-        >
+        <table className="volatility-table">
           <thead>
-            <tr style={{ borderBottom: '2px solid #ddd' }}>
-              <th>Ticker</th>
-              <th>Price</th>
-              <th>Volatility (%)</th>
-              <th>Bulbs</th>
-              <th>Support</th>
-              <th>Resistance</th>
+            <tr>
+              <th>Ticker</th><th>Price</th><th>Vol %</th><th>Bulbs</th><th>S</th><th>R</th>
             </tr>
           </thead>
           <tbody>
-            {data.map(({ symbol, price, atrPercent, bulbCount, support, resistance }) => {
-              const showFire = atrPercent > 60;
-              return (
-                <tr
-                  key={symbol}
-                  style={{
-                    backgroundColor: showFire ? '#fdd' : 'transparent',
-                    fontWeight: showFire ? 'bold' : 'normal',
-                  }}
-                >
-                  <td>
-                    {symbol} {showFire && '🔥'}
-                  </td>
-                  <td>{price}</td>
-                  <td>{atrPercent.toFixed(2)}</td>
-                  <td>{formatBulbs(bulbCount)}</td>
-                  <td>{support}</td>
-                  <td>{resistance}</td>
-                </tr>
-              );
-            })}
+            {rows.map(r => (
+              <tr key={r.symbol} className={r.atrPercent > 60 ? 'alert-row' : ''}>
+                <td>{r.symbol} {r.atrPercent > 60 && '🔥'}</td>
+                <td>{r.price}</td>
+                <td>{r.atrPercent.toFixed(2)}</td>
+                <td>{bulbs(r.bulbs)}</td>
+                <td>{r.support}</td>
+                <td>{r.resistance}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}
 
-      {/* Audio for alert */}
-      <audio
-        ref={soundRef}
-        src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
-        preload="auto"
-      ></audio>
+      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto" />
     </div>
   );
 }
-
-export default App;
