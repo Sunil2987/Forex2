@@ -4,9 +4,9 @@ const API_KEY = 'ca4cbc17c9524d5182b781c1e71ff6d5';  // Your Twelve Data API key
 
 const TICKERS = [ { symbol: 'BTC/USD', key: 'BTC/USD' }, { symbol: 'XAU/USD', key: 'XAU/USD' }, { symbol: 'GBP/CAD', key: 'GBP/CAD' }, { symbol: 'USD/JPY', key: 'USD/JPY' }, ];
 
-export default function App() { const [rows, setRows] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [count, setCount] = useState(300);   // 5-min countdown const timerRef = useRef(null); const audioRef = useRef(null);
+export default function App() { const [rows, setRows] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [count, setCount] = useState(300); const timerRef = useRef(null); const audioRef = useRef(null);
 
-const refreshAllowed = () => { const now = new Date(); const utc = now.getTime() + now.getTimezoneOffset() * 60000; const ist = new Date(utc + 5.5 * 60 * 60000);   // IST = UTC+5:30 const h = ist.getHours(); const d = ist.getDay();                       // 0-Sun … 6-Sat return d >= 1 && d <= 5 && h >= 12 && h < 24;   // Mon-Fri 12:00-23:59 };
+const refreshAllowed = () => { const now = new Date(); const utc = now.getTime() + now.getTimezoneOffset() * 60000; const ist = new Date(utc + 5.5 * 60 * 60000); const h = ist.getHours(); const d = ist.getDay(); return d >= 1 && d <= 5 && h >= 12 && h < 24; };
 
 const fetchData = async () => { setLoading(true); setError(''); try { const results = await Promise.all( TICKERS.map(async ({ symbol, key }) => { const priceRes = await fetch( https://api.twelvedata.com/price?symbol=${symbol}&apikey=${API_KEY} ); const priceJson = await priceRes.json(); if (priceJson.status === 'error') throw new Error(priceJson.message);
 
