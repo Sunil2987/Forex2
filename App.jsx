@@ -106,7 +106,7 @@ export default function App() {
         <table className="volatility-table">
           <thead>
             <tr>
-              <th>Ticker</th><th>Price</th><th>Vol %</th><th>Bulbs</th><th>S</th><th>R</th>
+              <th>Ticker</th><th>Price</th><th>Vol %</th><th>Bulbs</th>
             </tr>
           </thead>
           <tbody>
