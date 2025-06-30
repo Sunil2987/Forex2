@@ -11,6 +11,8 @@ const TICKERS = [
   { symbol: 'USD/JPY', key: 'USD/JPY' },
 ];
 
+const ATR_THRESHOLD = 1.5; // 1.5% threshold
+
 export default function App() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,40 +48,99 @@ export default function App() {
     try {
       const results = await Promise.all(
         TICKERS.map(async ({ symbol, key }) => {
-          const priceRes = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${API_KEY}`);
-          const priceJson = await priceRes.json();
-          if (priceJson.status === 'error') throw new Error(priceJson.message);
+          try {
+            // Fetch current price
+            const priceRes = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${API_KEY}`);
+            const priceJson = await priceRes.json();
+            
+            if (priceJson.status === 'error') {
+              throw new Error(`Price API error for ${symbol}: ${priceJson.message}`);
+            }
 
-          const atrRes = await fetch(`https://api.twelvedata.com/atr?symbol=${symbol}&interval=1day&time_period=14&apikey=${API_KEY}`);
-          const atrJson = await atrRes.json();
-          if (atrJson.status === 'error') throw new Error(atrJson.message);
+            // Fetch ATR data
+            const atrRes = await fetch(`https://api.twelvedata.com/atr?symbol=${symbol}&interval=1day&time_period=14&apikey=${API_KEY}`);
+            const atrJson = await atrRes.json();
+            
+            if (atrJson.status === 'error') {
+              throw new Error(`ATR API error for ${symbol}: ${atrJson.message}`);
+            }
 
-          const price = parseFloat(priceJson.price);
-          const atr = parseFloat(atrJson.values?.[0]?.atr ?? 0);
-          const atrPercent = price ? (atr / price) * 100 : 0;
-          const bulbs = atrPercent >= 5 ? 5 : Math.max(1, Math.round((atrPercent / 5) * 5));
+            // Parse and validate data
+            const price = parseFloat(priceJson.price);
+            if (isNaN(price) || price <= 0) {
+              throw new Error(`Invalid price for ${symbol}: ${priceJson.price}`);
+            }
 
-          return {
-            symbol: key,
-            price: price.toFixed(4),
-            atrPercent,
-            bulbs,
-          };
+            // Get the most recent ATR value
+            const atrValues = atrJson.values;
+            if (!atrValues || !Array.isArray(atrValues) || atrValues.length === 0) {
+              throw new Error(`No ATR data available for ${symbol}`);
+            }
+
+            const atrValue = parseFloat(atrValues[0]?.atr);
+            if (isNaN(atrValue) || atrValue < 0) {
+              throw new Error(`Invalid ATR value for ${symbol}: ${atrValues[0]?.atr}`);
+            }
+
+            // Calculate ATR percentage
+            const atrPercent = (atrValue / price) * 100;
+            
+            // Calculate bulbs (1-5 scale based on threshold)
+            const bulbs = Math.min(5, Math.max(1, Math.ceil((atrPercent / ATR_THRESHOLD) * 1)));
+
+            // Format price based on symbol type
+            let formattedPrice;
+            if (symbol.includes('XAU') || symbol.includes('BTC')) {
+              // No decimal for XAU and BTC
+              formattedPrice = Math.round(price).toString();
+            } else {
+              // Two decimal places for all other pairs
+              formattedPrice = price.toFixed(2);
+            }
+
+            return {
+              symbol: key,
+              price: formattedPrice,
+              atr: atrValue.toFixed(2),
+              atrPercent,
+              bulbs,
+              isAlert: atrPercent >= ATR_THRESHOLD,
+            };
+          } catch (tickerError) {
+            console.error(`Error fetching ${symbol}:`, tickerError.message);
+            return {
+              symbol: key,
+              price: 'Error',
+              atr: 'Error',
+              atrPercent: 0,
+              bulbs: 0,
+              isAlert: false,
+              error: tickerError.message,
+            };
+          }
         })
       );
 
+      // Sort by ATR percentage (highest first)
       results.sort((a, b) => b.atrPercent - a.atrPercent);
       setRows(results);
 
-      const triggered = results.filter(r => r.atrPercent >= 5); // Updated threshold to 5%
+      // Check for alerts (ATR >= 1.5%)
+      const triggered = results.filter(r => r.isAlert && !r.error);
       if (triggered.length > 0) {
-        const msg = '⚠️ High Volatility Alert:\n' + triggered.map(r => `${r.symbol}: ${r.atrPercent.toFixed(2)}%`).join('\n');
-        audioRef.current?.play().catch(() => {});
+        const msg = '⚠️ High Volatility Alert (ATR ≥ 1.5%):\n' + 
+          triggered.map(r => `${r.symbol}: ${r.atrPercent.toFixed(2)}% (ATR: ${r.atr})`).join('\n');
+        
+        // Play alert sound
+        audioRef.current?.play().catch(e => console.log('Audio play failed:', e));
+        
+        // Send Telegram alert
         sendTelegramAlert(msg);
       }
 
     } catch (err) {
-      setError(err.message || 'Fetch failed');
+      console.error('Fetch error:', err);
+      setError(err.message || 'Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -102,52 +163,171 @@ export default function App() {
     return () => clearInterval(timerRef.current);
   }, []);
 
-  const bulbs = (n, isAlert) =>
-    isAlert ? <span className="bulbs-alert">{'💡'.repeat(n)}</span> : '💡'.repeat(n);
+  const renderBulbs = (bulbs, isAlert) => {
+    const bulbEmoji = '💡';
+    const bulbString = bulbEmoji.repeat(Math.max(0, bulbs));
+    return isAlert ? (
+      <span style={{ color: '#ff4444', fontWeight: 'bold', animation: 'blink 1s infinite' }}>
+        {bulbString}
+      </span>
+    ) : bulbString;
+  };
 
   return (
-    <div className="app">
-      <h1 className="header">Forex + BTC Volatility Monitor</h1>
+    <div style={{ 
+      fontFamily: 'Arial, sans-serif', 
+      padding: '20px', 
+      maxWidth: '800px', 
+      margin: '0 auto',
+      backgroundColor: '#f5f5f5'
+    }}>
+      <style>{`
+        .alert-row { 
+          background-color: #ffebee !important; 
+          border-left: 4px solid #f44336;
+        }
+        .threshold-hit { 
+          color: #f44336; 
+          font-weight: bold; 
+        }
+        @keyframes blink {
+          0%, 50% { opacity: 1; }
+          51%, 100% { opacity: 0.3; }
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+          padding: 12px;
+          text-align: left;
+          border-bottom: 1px solid #ddd;
+        }
+        th {
+          background-color: #f8f9fa;
+          font-weight: bold;
+        }
+        tr:hover {
+          background-color: #f5f5f5;
+        }
+        .refresh-btn {
+          background: #007bff;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-bottom: 15px;
+        }
+        .refresh-btn:hover {
+          background: #0056b3;
+        }
+        .error {
+          color: #d32f2f;
+          background: #ffebee;
+          padding: 10px;
+          border-radius: 4px;
+          border-left: 4px solid #d32f2f;
+        }
+        .loading {
+          color: #1976d2;
+          font-weight: bold;
+        }
+      `}</style>
 
-      <button className="refresh-btn" onClick={() => { fetchData(); setCount(300); }}>
-        Refresh Now
+      <h1 style={{ color: '#333', textAlign: 'center' }}>
+        Forex + BTC Volatility Monitor (ATR Threshold: 1.5%)
+      </h1>
+
+      <button 
+        className="refresh-btn"
+        onClick={() => { 
+          fetchData(); 
+          setCount(300); 
+        }}
+        disabled={loading}
+      >
+        {loading ? 'Refreshing...' : 'Refresh Now'}
       </button>
 
-      <p className="countdown">Next auto-refresh in: <strong>{count}s</strong></p>
+      <p style={{ color: '#666' }}>
+        Next auto-refresh in: <strong style={{ color: '#007bff' }}>{count}s</strong>
+        {!refreshAllowed() && (
+          <span style={{ color: '#ff9800', marginLeft: '10px' }}>
+            (Auto-refresh disabled outside IST 12:00-24:00, Mon-Fri)
+          </span>
+        )}
+      </p>
 
-      {loading && <p className="loading">Loading…</p>}
+      {loading && <p className="loading">Loading market data...</p>}
       {error && <p className="error">Error: {error}</p>}
 
-      {!loading && !error && (
+      {!loading && rows.length > 0 && (
         <>
-          <table className="volatility-table">
+          <table>
             <thead>
               <tr>
-                <th>Ticker</th><th>Price</th><th>Vol %</th><th>Bulbs</th>
+                <th>Ticker</th>
+                <th>Price</th>
+                <th>ATR Value</th>
+                <th>ATR %</th>
+                <th>Volatility</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.symbol} className={r.atrPercent >= 6 ? 'alert-row' : ''}>
-                  <td>{r.symbol} {r.atrPercent >= 6 && '🔥'}</td>
-                  <td>{r.price}</td>
+                <tr key={r.symbol} className={r.isAlert ? 'alert-row' : ''}>
                   <td>
-                    {r.atrPercent.toFixed(2)}%
-                    {r.atrPercent >= 5 && <span className="threshold-hit"> / 5%</span>}
+                    {r.symbol} 
+                    {r.isAlert && ' 🔥'}
+                    {r.error && ' ⚠️'}
                   </td>
-                  <td>{bulbs(r.bulbs, r.atrPercent >= 5)}</td>
+                  <td>{r.price}</td>
+                  <td>{r.atr}</td>
+                  <td>
+                    {r.error ? (
+                      <span style={{ color: '#d32f2f' }}>Error</span>
+                    ) : (
+                      <>
+                        {r.atrPercent.toFixed(2)}%
+                        {r.isAlert && (
+                          <span className="threshold-hit"> ≥ {ATR_THRESHOLD}%</span>
+                        )}
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    {r.error ? '❌' : renderBulbs(r.bulbs, r.isAlert)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
+          <div style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+            <p><strong>Legend:</strong></p>
+            <p>💡 = Volatility level (1-5 bulbs) | 🔥 = High volatility alert (≥1.5%) | ⚠️ = Data error</p>
+            <p>ATR = Average True Range (14-day) | Higher ATR% = Higher volatility</p>
+          </div>
+
           <pre id="volatility-json" style={{ display: 'none' }}>
-            {JSON.stringify(rows.map(r => ({ symbol: r.symbol, vol: parseFloat(r.atrPercent.toFixed(2)) })))}
+            {JSON.stringify(rows.filter(r => !r.error).map(r => ({ 
+              symbol: r.symbol, 
+              vol: parseFloat(r.atrPercent.toFixed(2)),
+              atr: parseFloat(r.atr),
+              alert: r.isAlert
+            })), null, 2)}
           </pre>
         </>
       )}
 
-      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto" />
+      <audio 
+        ref={audioRef} 
+        src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" 
+        preload="auto" 
+      />
     </div>
   );
 }
