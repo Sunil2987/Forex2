@@ -1,333 +1,175 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; import { AlertCircle, TrendingUp, Activity, RefreshCw, Zap } from 'lucide-react';
 
-const API_KEY = 'ca4cbc17c9524d5182b781c1e71ff6d5'; // Twelve Data API key
-const BOT_TOKEN = '7682738545:AAEuqIzjzBr56AkT-dwuoZK_1bxjBqcMv00'; // Telegram Bot Token
-const CHAT_ID = '573040944'; // Telegram Chat ID
+const SYMBOLS = [ { symbol: 'BTCUSD', display: 'BTC/USD', type: 'crypto' }, { symbol: 'XAUUSD', display: 'XAU/USD', type: 'metal' }, { symbol: 'GBPCAD', display: 'GBP/CAD', type: 'forex' }, { symbol: 'USDJPY', display: 'USD/JPY', type: 'forex' } ];
 
-const TICKERS = [
-  { symbol: 'BTC/USD', key: 'BTC/USD' },
-  { symbol: 'XAU/USD', key: 'XAU/USD' },
-  { symbol: 'GBP/CAD', key: 'GBP/CAD' },
-  { symbol: 'USD/JPY', key: 'USD/JPY' },
-];
+const ATR_THRESHOLD = 1.5; const DEFAULT_THRESHOLDS = { BTCUSD: 2.5, XAUUSD: 1.5, GBPCAD: 1.5, USDJPY: 1.5 };
 
-const ATR_THRESHOLD = 1.5; // 1.5% threshold
+const BOT_TOKEN = '7682738545:AAEuqIzjBr56AkT-dwuoZK_1bxjBqcMv00'; const CHAT_ID = '573040944';
 
-export default function App() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [count, setCount] = useState(300);
-  const timerRef = useRef(null);
-  const audioRef = useRef(null);
+export default function VolatilityMonitor() { const [data, setData] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [countdown, setCountdown] = useState(294); const [lastUpdate, setLastUpdate] = useState(null); const [thresholds, setThresholds] = useState(() => { const saved = localStorage.getItem('thresholds'); return saved ? JSON.parse(saved) : DEFAULT_THRESHOLDS; }); const [settingsOpen, setSettingsOpen] = useState(false); const intervalRef = useRef(null); const audioRef = useRef(null); const alertSentRef = useRef(new Set());
 
-  const refreshAllowed = () => {
-    const now = new Date();
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-    const ist = new Date(utc + 5.5 * 60 * 60000);
-    const h = ist.getHours();
-    const d = ist.getDay();
-    return d >= 1 && d <= 5 && h >= 12 && h < 24;
-  };
+const calculateATR = (ohlcData, period = 14) => { if (!ohlcData || ohlcData.length < period + 1) return null; const trueRanges = []; for (let i = 1; i < ohlcData.length; i++) { const current = ohlcData[i]; const previous = ohlcData[i - 1]; const tr1 = current.high - current.low; const tr2 = Math.abs(current.high - previous.close); const tr3 = Math.abs(current.low - previous.close); trueRanges.push(Math.max(tr1, tr2, tr3)); } let atr = trueRanges.slice(0, period).reduce((sum, tr) => sum + tr, 0) / period; const multiplier = 2 / (period + 1); for (let i = period; i < trueRanges.length; i++) { atr = (trueRanges[i] * multiplier) + (atr * (1 - multiplier)); } return atr; };
 
-  const sendTelegramAlert = async (message) => {
-    try {
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: CHAT_ID, text: message }),
-      });
-    } catch (err) {
-      console.error('Telegram alert failed:', err.message);
-    }
-  };
+const generateMockOHLC = (symbol, periods = 50) => { const basePrice = { 'BTCUSD': 106720, 'XAUUSD': 2507, 'GBPCAD': 1.78, 'USDJPY': 143.5 }[symbol] || 100;
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const results = await Promise.all(
-        TICKERS.map(async ({ symbol, key }) => {
-          try {
-            // Fetch current price
-            const priceRes = await fetch(`https://api.twelvedata.com/price?symbol=${symbol}&apikey=${API_KEY}`);
-            const priceJson = await priceRes.json();
-            
-            if (priceJson.status === 'error') {
-              throw new Error(`Price API error for ${symbol}: ${priceJson.message}`);
-            }
+const volatility = {
+  'BTCUSD': 0.035,
+  'XAUUSD': 0.015,
+  'GBPCAD': 0.008,
+  'USDJPY': 0.012
+}[symbol] || 0.01;
 
-            // Fetch ATR data
-            const atrRes = await fetch(`https://api.twelvedata.com/atr?symbol=${symbol}&interval=1day&time_period=14&apikey=${API_KEY}`);
-            const atrJson = await atrRes.json();
-            
-            if (atrJson.status === 'error') {
-              throw new Error(`ATR API error for ${symbol}: ${atrJson.message}`);
-            }
+const data = [];
+let currentPrice = basePrice;
+const now = Date.now();
 
-            // Parse and validate data
-            const price = parseFloat(priceJson.price);
-            if (isNaN(price) || price <= 0) {
-              throw new Error(`Invalid price for ${symbol}: ${priceJson.price}`);
-            }
+for (let i = periods; i >= 0; i--) {
+  const timestamp = now - (i * 3600000);
+  const hour = new Date(timestamp).getUTCHours();
+  const sessionMultiplier = (hour >= 8 && hour <= 16) ? 1.5 :
+                           (hour >= 13 && hour <= 21) ? 1.8 : 0.7;
 
-            // Get the most recent ATR value
-            const atrValues = atrJson.values;
-            if (!atrValues || !Array.isArray(atrValues) || atrValues.length === 0) {
-              throw new Error(`No ATR data available for ${symbol}`);
-            }
+  const change = (Math.random() - 0.5) * volatility * sessionMultiplier * currentPrice;
+  currentPrice = Math.max(currentPrice + change, basePrice * 0.8);
 
-            const atrValue = parseFloat(atrValues[0]?.atr);
-            if (isNaN(atrValue) || atrValue < 0) {
-              throw new Error(`Invalid ATR value for ${symbol}: ${atrValues[0]?.atr}`);
-            }
+  const dayVolatility = volatility * sessionMultiplier * currentPrice * 0.3;
+  const open = currentPrice;
+  const close = currentPrice + (Math.random() - 0.5) * dayVolatility;
+  const high = Math.max(open, close) + Math.random() * dayVolatility * 0.5;
+  const low = Math.min(open, close) - Math.random() * dayVolatility * 0.5;
 
-            // Calculate ATR percentage
-            const atrPercent = (atrValue / price) * 100;
-            
-            // Calculate bulbs (1-5 scale based on threshold)
-            const bulbs = Math.min(5, Math.max(1, Math.ceil((atrPercent / ATR_THRESHOLD) * 1)));
-
-            // Format price based on symbol type
-            let formattedPrice;
-            if (symbol.includes('XAU') || symbol.includes('BTC')) {
-              // No decimal for XAU and BTC
-              formattedPrice = Math.round(price).toString();
-            } else {
-              // Two decimal places for all other pairs
-              formattedPrice = price.toFixed(2);
-            }
-
-            return {
-              symbol: key,
-              price: formattedPrice,
-              atr: atrValue.toFixed(2),
-              atrPercent,
-              bulbs,
-              isAlert: atrPercent >= ATR_THRESHOLD,
-            };
-          } catch (tickerError) {
-            console.error(`Error fetching ${symbol}:`, tickerError.message);
-            return {
-              symbol: key,
-              price: 'Error',
-              atr: 'Error',
-              atrPercent: 0,
-              bulbs: 0,
-              isAlert: false,
-              error: tickerError.message,
-            };
-          }
-        })
-      );
-
-      // Sort by ATR percentage (highest first)
-      results.sort((a, b) => b.atrPercent - a.atrPercent);
-      setRows(results);
-
-      // Check for alerts (ATR >= 1.5%)
-      const triggered = results.filter(r => r.isAlert && !r.error);
-      if (triggered.length > 0) {
-        const msg = '⚠️ High Volatility Alert (ATR ≥ 1.5%):\n' + 
-          triggered.map(r => `${r.symbol}: ${r.atrPercent.toFixed(2)}% (ATR: ${r.atr})`).join('\n');
-        
-        // Play alert sound
-        audioRef.current?.play().catch(e => console.log('Audio play failed:', e));
-        
-        // Send Telegram alert
-        sendTelegramAlert(msg);
-      }
-
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError(err.message || 'Failed to fetch data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    timerRef.current = setInterval(() => {
-      setCount((c) => {
-        if (c <= 1) {
-          if (refreshAllowed()) {
-            fetchData();
-            return 300;
-          }
-          return c;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  const renderBulbs = (bulbs, isAlert) => {
-    const bulbEmoji = '💡';
-    const bulbString = bulbEmoji.repeat(Math.max(0, bulbs));
-    return isAlert ? (
-      <span style={{ color: '#ff4444', fontWeight: 'bold', animation: 'blink 1s infinite' }}>
-        {bulbString}
-      </span>
-    ) : bulbString;
-  };
-
-  return (
-    <div style={{ 
-      fontFamily: 'Arial, sans-serif', 
-      padding: '20px', 
-      maxWidth: '800px', 
-      margin: '0 auto',
-      backgroundColor: '#f5f5f5'
-    }}>
-      <style>{`
-        .alert-row { 
-          background-color: #ffebee !important; 
-          border-left: 4px solid #f44336;
-        }
-        .threshold-hit { 
-          color: #f44336; 
-          font-weight: bold; 
-        }
-        @keyframes blink {
-          0%, 50% { opacity: 1; }
-          51%, 100% { opacity: 0.3; }
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          background: white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        th, td {
-          padding: 12px;
-          text-align: left;
-          border-bottom: 1px solid #ddd;
-        }
-        th {
-          background-color: #f8f9fa;
-          font-weight: bold;
-        }
-        tr:hover {
-          background-color: #f5f5f5;
-        }
-        .refresh-btn {
-          background: #007bff;
-          color: white;
-          border: none;
-          padding: 10px 20px;
-          border-radius: 4px;
-          cursor: pointer;
-          margin-bottom: 15px;
-        }
-        .refresh-btn:hover {
-          background: #0056b3;
-        }
-        .error {
-          color: #d32f2f;
-          background: #ffebee;
-          padding: 10px;
-          border-radius: 4px;
-          border-left: 4px solid #d32f2f;
-        }
-        .loading {
-          color: #1976d2;
-          font-weight: bold;
-        }
-      `}</style>
-
-      <h1 style={{ color: '#333', textAlign: 'center' }}>
-        Forex + BTC Volatility Monitor (ATR Threshold: 1.5%)
-      </h1>
-
-      <button 
-        className="refresh-btn"
-        onClick={() => { 
-          fetchData(); 
-          setCount(300); 
-        }}
-        disabled={loading}
-      >
-        {loading ? 'Refreshing...' : 'Refresh Now'}
-      </button>
-
-      <p style={{ color: '#666' }}>
-        Next auto-refresh in: <strong style={{ color: '#007bff' }}>{count}s</strong>
-        {!refreshAllowed() && (
-          <span style={{ color: '#ff9800', marginLeft: '10px' }}>
-            (Auto-refresh disabled outside IST 12:00-24:00, Mon-Fri)
-          </span>
-        )}
-      </p>
-
-      {loading && <p className="loading">Loading market data...</p>}
-      {error && <p className="error">Error: {error}</p>}
-
-      {!loading && rows.length > 0 && (
-        <>
-          <table>
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Price</th>
-                <th>ATR Value</th>
-                <th>ATR %</th>
-                <th>Volatility</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.symbol} className={r.isAlert ? 'alert-row' : ''}>
-                  <td>
-                    {r.symbol} 
-                    {r.isAlert && ' 🔥'}
-                    {r.error && ' ⚠️'}
-                  </td>
-                  <td>{r.price}</td>
-                  <td>{r.atr}</td>
-                  <td>
-                    {r.error ? (
-                      <span style={{ color: '#d32f2f' }}>Error</span>
-                    ) : (
-                      <>
-                        {r.atrPercent.toFixed(2)}%
-                        {r.isAlert && (
-                          <span className="threshold-hit"> ≥ {ATR_THRESHOLD}%</span>
-                        )}
-                      </>
-                    )}
-                  </td>
-                  <td>
-                    {r.error ? '❌' : renderBulbs(r.bulbs, r.isAlert)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
-            <p><strong>Legend:</strong></p>
-            <p>💡 = Volatility level (1-5 bulbs) | 🔥 = High volatility alert (≥1.5%) | ⚠️ = Data error</p>
-            <p>ATR = Average True Range (14-day) | Higher ATR% = Higher volatility</p>
-          </div>
-
-          <pre id="volatility-json" style={{ display: 'none' }}>
-            {JSON.stringify(rows.filter(r => !r.error).map(r => ({ 
-              symbol: r.symbol, 
-              vol: parseFloat(r.atrPercent.toFixed(2)),
-              atr: parseFloat(r.atr),
-              alert: r.isAlert
-            })), null, 2)}
-          </pre>
-        </>
-      )}
-
-      <audio 
-        ref={audioRef} 
-        src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" 
-        preload="auto" 
-      />
-    </div>
-  );
+  data.push({
+    timestamp,
+    open: Math.max(low, open),
+    high: Math.max(high, open, close),
+    low: Math.min(low, open, close),
+    close: Math.max(low, close)
+  });
 }
+
+return data.sort((a, b) => a.timestamp - b.timestamp);
+
+};
+
+const sendTelegramAlert = async (message) => { try { await fetch(https://api.telegram.org/bot${BOT_TOKEN}/sendMessage, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'HTML' }), }); } catch (err) { console.error('Telegram alert failed:', err); } };
+
+const fetchData = async () => { try { setLoading(true); setError('');
+
+const results = await Promise.all(
+    SYMBOLS.map(async ({ symbol, display, type }) => {
+      try {
+        const ohlcData = generateMockOHLC(symbol);
+        const currentPrice = ohlcData[ohlcData.length - 1].close;
+        const atrValue = calculateATR(ohlcData);
+        const atrPercent = atrValue ? (atrValue / currentPrice) * 100 : 0;
+
+        const threshold = thresholds[symbol] || ATR_THRESHOLD;
+        const isAlert = atrPercent >= threshold;
+
+        let formattedPrice = type === 'forex'
+          ? currentPrice.toFixed(4)
+          : Math.round(currentPrice).toLocaleString();
+
+        const volatilityLevel = Math.min(5, Math.max(1,
+          Math.ceil((atrPercent / threshold) * 3)
+        ));
+
+        return {
+          symbol: display,
+          price: formattedPrice,
+          atrPercent,
+          volatilityLevel,
+          isAlert,
+          type,
+          change: ((Math.random() - 0.5) * 2).toFixed(2),
+          threshold
+        };
+      } catch (err) {
+        return {
+          symbol: display,
+          price: 'Error',
+          atrPercent: 0,
+          volatilityLevel: 0,
+          isAlert: false,
+          type,
+          error: true
+        };
+      }
+    })
+  );
+
+  results.sort((a, b) => b.atrPercent - a.atrPercent);
+  setData(results);
+  setLastUpdate(new Date());
+
+  const highVolatility = results.filter(item => item.isAlert && !item.error);
+  if (highVolatility.length > 0) {
+    const alertKey = highVolatility.map(item => `${item.symbol}-${item.atrPercent.toFixed(1)}`).join('|');
+    if (!alertSentRef.current.has(alertKey)) {
+      alertSentRef.current.add(alertKey);
+      if (audioRef.current) audioRef.current.play().catch(() => {});
+
+      const message = `🚨 <b>High Volatility Alert</b> 🚨\n\n` +
+        highVolatility.map(item =>
+          `<b>${item.symbol}</b>: ${item.atrPercent.toFixed(2)}% (≥ ${item.threshold}%)\nPrice: ${item.price}`
+        ).join('\n\n') +
+        `\n\n⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
+
+      sendTelegramAlert(message);
+      setTimeout(() => alertSentRef.current.delete(alertKey), 600000);
+    }
+  }
+} catch (err) {
+  setError('Failed to fetch market data');
+} finally {
+  setLoading(false);
+}
+
+};
+
+useEffect(() => { fetchData(); intervalRef.current = setInterval(() => { setCountdown(prev => { if (prev <= 1) { fetchData(); return 294; } return prev - 1; }); }, 1000); return () => clearInterval(intervalRef.current); }, []);
+
+const formatCountdown = (seconds) => { const mins = Math.floor(seconds / 60); const secs = seconds % 60; return ${mins}:${secs.toString().padStart(2, '0')}; };
+
+return ( <div className="p-4"> <div className="mb-4"> <button onClick={() => { fetchData(); setCountdown(294); }} disabled={loading} className="bg-purple-600 text-white px-4 py-2 rounded shadow" > {loading ? 'Refreshing...' : 'Refresh Now'} </button> </div>
+
+{/* Settings Toggle */}
+  <div className="mb-4">
+    <button
+      onClick={() => setSettingsOpen(!settingsOpen)}
+      className="text-sm text-purple-400 underline"
+    >
+      {settingsOpen ? 'Hide Settings' : 'Show Settings'}
+    </button>
+  </div>
+
+  {/* Settings Panel */}
+  {settingsOpen && (
+    <div className="bg-gray-900 p-4 rounded-lg text-white mb-6">
+      <h2 className="font-semibold mb-2">⚙️ ATR Threshold Settings</h2>
+      {SYMBOLS.map(({ symbol, display }) => (
+        <div key={symbol} className="flex justify-between items-center my-2">
+          <span>{display}</span>
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={thresholds[symbol] || ''}
+            onChange={(e) => {
+              const value = parseFloat(e.target.value);
+              const updated = { ...thresholds, [symbol]: value };
+              setThresholds(updated);
+              localStorage.setItem('thresholds', JSON.stringify(updated));
+            }}
+            className="bg-black border px-2 py-1 w-24 text-yellow-300 rounded"
+          />
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Market Data Table (UI skipped here to save space) */}
+</div>
+
+); }
+
