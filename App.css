@@ -8,45 +8,52 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  overflow: hidden; /* Prevent scrolling */
 }
 
 .app {
   background: rgba(20, 20, 20, 0.95);
   padding: 2rem;
   border-radius: 1.5rem;
-  box-shadow: 0 0 15px rgba(0, 255, 200, 0.2);
-  backdrop-filter: blur(10px);
-  width: 95%;
+  box-shadow: 0 0 25px rgba(0, 255, 200, 0.3); /* Enhanced shadow */
+  backdrop-filter: blur(15px); /* Increased blur for depth */
+  width: 90%; /* Adjusted for better mobile fit */
   max-width: 700px;
+  transition: transform 0.3s ease; /* Smooth scaling effect */
+}
+
+.app:hover {
+  transform: scale(1.02); /* Slightly enlarge on hover */
 }
 
 .header {
   text-align: center;
   color: #00ffcc;
-  font-size: 1.8rem;
+  font-size: 2rem; /* Increased font size for better visibility */
   margin-bottom: 1rem;
 }
 
 .refresh-btn {
   display: block;
   margin: 0 auto 1rem;
-  padding: 0.5rem 1.5rem;
-  font-size: 1rem;
+  padding: 0.75rem 2rem; /* Increased padding for better touch targets */
+  font-size: 1.1rem; /* Slightly larger font size */
   background-color: #00ffcc;
   color: #000;
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  transition: 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.2s ease; /* Added transform transition */
 }
 
 .refresh-btn:hover {
   background-color: #00e6b8;
+  transform: translateY(-2px); /* Lift effect on hover */
 }
 
 .countdown {
   text-align: center;
-  font-size: 1rem;
+  font-size: 1.2rem; /* Increased font size for better visibility */
   margin-bottom: 1rem;
   color: #aaa;
 }
@@ -68,7 +75,7 @@ body {
 
 .volatility-table th,
 .volatility-table td {
-  padding: 0.75rem 1rem;
+  padding: 1rem; /* Increased padding for better readability */
   text-align: center;
   border-bottom: 1px solid #222;
 }
@@ -80,7 +87,28 @@ body {
 }
 
 .alert-row {
-  background-color: rgba(255, 0, 0, 0.15);
+  background-color: rgba(255, 0, 0, 0.25); /* More pronounced alert color */
   font-weight: bold;
   color: #ff5f5f;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .header {
+    font-size: 1.5rem; /* Adjust header size for smaller screens */
+  }
+
+  .refresh-btn {
+    padding: 0.5rem 1rem; /* Adjust button padding for smaller screens */
+    font-size: 1rem; /* Adjust button font size */
+  }
+
+  .countdown {
+    font-size: 1rem; /* Adjust countdown font size */
+  }
+
+  .volatility-table th,
+  .volatility-table td {
+    padding: 0.5rem; /* Adjust table cell padding */
+  }
 }
