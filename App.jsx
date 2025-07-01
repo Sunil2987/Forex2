@@ -1,144 +1,115 @@
-import React, { useState, useEffect, useRef } from 'react'; import { Activity, RefreshCw, Zap, TrendingUp, AlertCircle } from 'lucide-react';
+// src/App.tsx import React, { useEffect, useState, useRef, useCallback } from "react";
 
-const SYMBOLS = [ { symbol: 'BTCUSD', display: 'BTC/USD', type: 'crypto', defaultThreshold: 2.5 }, { symbol: 'XAUUSD', display: 'XAU/USD', type: 'metal', defaultThreshold: 1.5 }, { symbol: 'GBPCAD', display: 'GBP/CAD', type: 'forex', defaultThreshold: 1.5 }, { symbol: 'USDJPY', display: 'USD/JPY', type: 'forex', defaultThreshold: 1.5 } ];
+interface MarketData { symbol: string; price: number; atr: number; volatility: number; change?: number; }
 
-const BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN; const CHAT_ID = import.meta.env.VITE_CHAT_ID;
+interface Thresholds { [key: string]: number; }
 
-export default function VolatilityMonitor() { const [data, setData] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [countdown, setCountdown] = useState(294); const [lastUpdate, setLastUpdate] = useState(null); const [thresholds, setThresholds] = useState(() => { const stored = localStorage.getItem('thresholds'); return stored ? JSON.parse(stored) : SYMBOLS.reduce((acc, s) => { acc[s.symbol] = s.defaultThreshold; return acc; }, {}); });
+const BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN as string; const CHAT_ID = import.meta.env.VITE_CHAT_ID as string; const API_KEY = import.meta.env.VITE_TWELVE_API_KEY as string;
 
-const intervalRef = useRef(null); const audioRef = useRef(null); const alertSentRef = useRef(new Set());
+const symbols = ["BTC/USD", "XAU/USD", "EUR/USD", "GBP/JPY"];
 
-const handleThresholdChange = (symbol, value) => { const val = parseFloat(value); if (!isNaN(val)) { const updated = { ...thresholds, [symbol]: val }; setThresholds(updated); localStorage.setItem('thresholds', JSON.stringify(updated)); } };
+const isMarketHours = (): boolean => { const now = new Date(); const utcHours = now.getUTCHours(); const utcMinutes = now.getUTCMinutes(); const totalMinutesIST = utcHours * 60 + utcMinutes + 330; const hourIST = Math.floor(totalMinutesIST / 60) % 24; const day = now.getUTCDay(); return day >= 1 && day <= 5 && hourIST >= 10 && hourIST <= 22; };
 
-const calculateATR = (ohlcData, period = 14) => { if (!ohlcData || ohlcData.length < period + 1) return null; const tr = []; for (let i = 1; i < ohlcData.length; i++) { const cur = ohlcData[i], prev = ohlcData[i - 1]; tr.push(Math.max( cur.high - cur.low, Math.abs(cur.high - prev.close), Math.abs(cur.low - prev.close) )); } let atr = tr.slice(0, period).reduce((a, b) => a + b, 0) / period; const mult = 2 / (period + 1); for (let i = period; i < tr.length; i++) atr = (tr[i] * mult) + (atr * (1 - mult)); return atr; };
+const App: React.FC = () => { const [data, setData] = useState<MarketData[]>([]); const [thresholds, setThresholds] = useState<Thresholds>({}); const [error, setError] = useState<string>(""); const audioRef = useRef<HTMLAudioElement>(null); const lastAlertRef = useRef<{ [key: string]: number }>({});
 
-const generateMockOHLC = (symbol, periods = 50) => { const base = { BTCUSD: 106720, XAUUSD: 2507, GBPCAD: 1.78, USDJPY: 143.5 }[symbol] || 100; const vol = { BTCUSD: 0.035, XAUUSD: 0.015, GBPCAD: 0.008, USDJPY: 0.012 }[symbol] || 0.01;
+const sendTelegramAlert = useCallback(async (message: string) => { try { await fetch(https://api.telegram.org/bot${BOT_TOKEN}/sendMessage, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: CHAT_ID, text: message }), }); } catch (err) { console.error("Telegram alert failed:", err); setError("Failed to send Telegram alert"); } }, []);
 
-let price = base;
-const data = [];
-const now = Date.now();
+const fetchData = useCallback(async () => { try { const updated: MarketData[] = []; for (const symbol of symbols) { const priceRes = await fetch( https://api.twelvedata.com/price?symbol=${symbol}&apikey=${API_KEY} ); const priceJson = await priceRes.json();
 
-for (let i = periods; i >= 0; i--) {
-  const ts = now - i * 3600000;
-  const hour = new Date(ts).getUTCHours();
-  const session = (hour >= 8 && hour <= 16) ? 1.5 : (hour >= 13 && hour <= 21) ? 1.8 : 0.7;
-  const change = (Math.random() - 0.5) * vol * session * price;
-  price = Math.max(price + change, base * 0.8);
-  const dv = vol * session * price * 0.3;
-  const open = price, close = price + (Math.random() - 0.5) * dv;
-  const high = Math.max(open, close) + Math.random() * dv * 0.5;
-  const low = Math.min(open, close) - Math.random() * dv * 0.5;
+const atrRes = await fetch(
+      `https://api.twelvedata.com/atr?symbol=${symbol}&interval=15min&time_period=14&apikey=${API_KEY}`
+    );
+    const atrJson = await atrRes.json();
 
-  data.push({ timestamp: ts, open, high, low, close });
-}
-return data.sort((a, b) => a.timestamp - b.timestamp);
+    const price = parseFloat(priceJson.price);
+    const atr = parseFloat(atrJson.values?.[0]?.atr);
+    const volatility = Math.min(10, Math.max(1, Math.round((atr / price) * 100)));
+    const change = parseFloat((Math.random() * 2 - 1).toFixed(2));
 
-};
-
-const sendTelegramAlert = async (message) => { try { await fetch(https://api.telegram.org/bot${BOT_TOKEN}/sendMessage, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'HTML' }) }); } catch (err) { console.error('Telegram alert failed:', err); } };
-
-const fetchData = async () => { try { setLoading(true); setError(''); const results = await Promise.all( SYMBOLS.map(async ({ symbol, display, type }) => { const ohlc = generateMockOHLC(symbol); const price = ohlc[ohlc.length - 1].close; const atr = calculateATR(ohlc); const atrPercent = atr ? (atr / price) * 100 : 0; const threshold = thresholds[symbol] || 1.5;
-
-const isAlert = atrPercent >= threshold;
-      const volatilityLevel = Math.min(5, Math.max(1, Math.ceil((atrPercent / threshold) * 3)));
-
-      return {
-        symbol: display,
-        price: type === 'forex' ? price.toFixed(4) : Math.round(price).toLocaleString(),
-        atrPercent,
-        isAlert,
-        volatilityLevel,
-        type,
-        change: ((Math.random() - 0.5) * 2).toFixed(2)
-      };
-    })
-  );
-
-  results.sort((a, b) => b.atrPercent - a.atrPercent);
-  setData(results);
-  setLastUpdate(new Date());
-
-  const alerts = results.filter(r => r.isAlert);
-  const alertKey = alerts.map(r => `${r.symbol}-${r.atrPercent.toFixed(1)}`).join('|');
-  if (!alertSentRef.current.has(alertKey)) {
-    alertSentRef.current.add(alertKey);
-    audioRef.current?.play();
-
-    const msg = `🚨 <b>High Volatility Alert</b> 🚨\n\n` +
-      alerts.map(a => `<b>${a.symbol}</b>: ${a.atrPercent.toFixed(2)}%\nPrice: ${a.price}`).join('\n\n') +
-      `\n\n⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`;
-    sendTelegramAlert(msg);
-
-    setTimeout(() => alertSentRef.current.delete(alertKey), 600000);
+    updated.push({ symbol, price, atr, volatility, change });
   }
-} catch (e) {
-  console.error(e);
-  setError('Failed to fetch data');
-} finally {
-  setLoading(false);
+  setData(updated);
+  updated.forEach((item) => {
+    const currentTime = Date.now();
+    const last = lastAlertRef.current[item.symbol] || 0;
+    const cooldown = 5 * 60 * 1000;
+    const threshold = thresholds[item.symbol] ?? 6;
+    if (
+      item.volatility >= threshold &&
+      isMarketHours() &&
+      currentTime - last > cooldown
+    ) {
+      if (audioRef.current) audioRef.current.play().catch(() => {});
+      sendTelegramAlert(
+        `⚠️ High Volatility Alert:\n${item.symbol} 🚨\nATR: ${item.atr}\nVolatility: ${item.volatility}/10`
+      );
+      lastAlertRef.current[item.symbol] = currentTime;
+    }
+  });
+} catch (err) {
+  setError("Failed to fetch market data");
 }
 
-};
+}, [thresholds, sendTelegramAlert]);
 
-const isMarketHours = () => { const now = new Date(); const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })); const h = ist.getHours(), d = ist.getDay(); return d >= 1 && d <= 5 && h >= 12 && h < 24; };
+useEffect(() => { fetchData(); const interval = setInterval(fetchData, 60000); return () => clearInterval(interval); }, [fetchData]);
 
-useEffect(() => { fetchData(); intervalRef.current = setInterval(() => { setCountdown(prev => { if (prev <= 1) { if (isMarketHours()) fetchData(); return 294; } return prev - 1; }); }, 1000); return () => clearInterval(intervalRef.current); }, []);
+const handleThresholdChange = (symbol: string, value: string) => { const num = parseInt(value, 10); if (!isNaN(num) && num >= 1 && num <= 10) { setThresholds((prev) => ({ ...prev, [symbol]: num })); } };
 
-return ( <div className="min-h-screen bg-gray-900 text-white p-4"> <div className="max-w-4xl mx-auto"> <h1 className="text-3xl font-bold mb-4 flex items-center gap-2"> <Activity /> Forex + BTC Volatility Monitor </h1>
+return ( <div className="min-h-screen bg-gray-900 text-white p-6 font-sans"> <h1 className="text-4xl font-bold text-center mb-8 text-blue-400"> 📈 Forex Volatility Monitor </h1>
 
-<div className="bg-gray-800 p-4 rounded-xl mb-6">
-      <h2 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Settings</h2>
-      {SYMBOLS.map(({ symbol }) => (
-        <div key={symbol} className="mb-2">
-          <label className="mr-2">{symbol} Threshold %:</label>
+{error && <div className="bg-red-700 p-3 rounded mb-4">{error}</div>}
+
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {data.map((item) => (
+      <div
+        key={item.symbol}
+        className="bg-gray-800 p-6 rounded-xl shadow-md border border-gray-700"
+      >
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-xl font-semibold text-blue-300">{item.symbol}</h2>
+          <span
+            className={`text-lg font-medium ${
+              item.change && item.change >= 0 ? "text-green-400" : "text-red-400"
+            }`}
+          >
+            {item.change > 0 ? "+" : ""}
+            {item.change?.toFixed(2)}%
+          </span>
+        </div>
+        <div>Price: ${item.price.toLocaleString()}</div>
+        <div>ATR: {item.atr.toFixed(4)}</div>
+        <div>
+          Volatility: {item.volatility}/10 {item.volatility >= (thresholds[item.symbol] ?? 6) && <span className="text-red-500 ml-2 animate-pulse">🚨</span>}
+        </div>
+        <div className="mt-2">
+          <label className="text-sm">Set Threshold:</label>
           <input
             type="number"
-            value={thresholds[symbol]}
-            step="0.1"
-            min="0"
-            className="text-black px-2 py-1 rounded"
-            onChange={e => handleThresholdChange(symbol, e.target.value)}
+            min="1"
+            max="10"
+            value={thresholds[item.symbol] ?? 6}
+            onChange={(e) => handleThresholdChange(item.symbol, e.target.value)}
+            className="ml-2 px-2 py-1 rounded bg-gray-700 border border-gray-600 text-white w-16"
           />
         </div>
-      ))}
-    </div>
+      </div>
+    ))}
+  </div>
 
-    {error && <div className="bg-red-500 text-white p-2 rounded mb-4 flex items-center gap-2"><AlertCircle /> {error}</div>}
+  <audio ref={audioRef} preload="auto">
+    <source
+      src="https://www.soundjay.com/buttons/beep-01a.wav"
+      type="audio/wav"
+    />
+  </audio>
 
-    {loading ? (
-      <div className="animate-pulse">Loading market data...</div>
-    ) : (
-      <table className="w-full text-sm bg-gray-800 rounded-xl overflow-hidden">
-        <thead>
-          <tr className="bg-gray-700">
-            <th className="p-2 text-left">Ticker</th>
-            <th className="p-2 text-left">Price</th>
-            <th className="p-2 text-left">ATR%</th>
-            <th className="p-2 text-left">Vol</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map(item => (
-            <tr key={item.symbol} className={item.isAlert ? 'bg-red-900' : 'hover:bg-gray-700'}>
-              <td className="p-2">{item.symbol} {item.isAlert && <Zap size={12} className="inline text-yellow-300" />}</td>
-              <td className="p-2">{item.price}</td>
-              <td className="p-2">{item.atrPercent.toFixed(2)}%</td>
-              <td className="p-2">{'💡'.repeat(item.volatilityLevel)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-
-    <div className="mt-4 text-sm text-gray-400">
-      Last Updated: {lastUpdate?.toLocaleTimeString()} | Next Refresh in: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
-    </div>
-
-    <audio ref={audioRef} preload="auto">
-      <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559uIiCW3Oy1hTYEgoO8+fGOQAoUnNny0H4wBT2H0e++ijoIG3ax7pyBMgcjdtztupsWJmzW8OGfbyQhktfuvYs3BmCg4OmGGwUtmtrx1YQPBRiE5vaUjBcQhrzl+5MUCp/W8cyBOwYtdNXq5Ks6ASms2e7XiSwCKmzT8NBFRELfnSQAE1ek8+DfQkb3nSUAGG6z79SAOws0bNLttJI2CBx1vfv2lTYJJm/T7MWROQUigMf37KMMF1XJ8fGdNAgsgt/lqjEDAGq68/BQREF/vzv/vRUKmlej9enp0EZBhT8A" type="audio/wav" />
-    </audio>
+  <div className="text-center text-gray-500 text-sm mt-8">
+    Data updates every 1 min. Alerts active only during IST market hours.
   </div>
 </div>
 
-); }
+); };
+
+export default App;
 
