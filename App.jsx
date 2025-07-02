@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from "react";
 
-const API_KEY = import.meta.env.VITE_TWELVE_API_KEY;
+const API_KEY = "demo"; // Replace with your actual API key
 const TICKERS = ["BTC/USD", "XAU/USD", "USD/JPY", "GBP/CAD", "EUR/USD"];
 
 function App() {
   const [data, setData] = useState([]);
-  const [threshold, setThreshold] = useState(
-    Number(localStorage.getItem("threshold")) || 1.5
-  );
+  const [threshold, setThreshold] = useState(1.5);
   const [refreshIn, setRefreshIn] = useState(300);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetchData();
-    const timer = setInterval(() => setRefreshIn((t) => (t > 0 ? t - 1 : 0)), 1000);
+    const timer = setInterval(() => setRefreshIn((t) => (t > 0 ? t - 1 : 300)), 1000);
     const refresh = setInterval(() => fetchData(), 300000);
     return () => {
       clearInterval(timer);
@@ -31,6 +29,29 @@ function App() {
         const [base, quote] = symbol.split("/");
         
         try {
+          // Simulate API calls with demo data for now
+          // Replace this with actual API calls when you have a valid API key
+          const simulatedData = {
+            "BTC/USD": { price: 107783.3900, atr: 248.00 },
+            "XAU/USD": { price: 3284.3000, atr: 5.58 },
+            "USD/JPY": { price: 144.6150, atr: 0.23 },
+            "GBP/CAD": { price: 1.8767, atr: 0.0028 },
+            "EUR/USD": { price: 1.0234, atr: 0.0015 }
+          };
+          
+          const mockData = simulatedData[symbol];
+          if (mockData) {
+            const { price, atr } = mockData;
+            return {
+              symbol,
+              price,
+              atr,
+              atrPercent: +(100 * (atr / price)).toFixed(2),
+            };
+          }
+          
+          // Uncomment below for actual API calls:
+          /*
           const atrResponse = await fetch(
             `https://api.twelvedata.com/atr?symbol=${base}${quote}&interval=15min&apikey=${API_KEY}`
           );
@@ -41,7 +62,6 @@ function App() {
           );
           const priceData = await priceResponse.json();
           
-          // Check for API errors
           if (atrData.status === "error" || priceData.status === "error") {
             throw new Error(`API Error for ${symbol}`);
           }
@@ -49,7 +69,6 @@ function App() {
           const atr = parseFloat(atrData.value || atrData.values?.[0]?.atr);
           const price = parseFloat(priceData.price);
           
-          // Validate numbers
           if (isNaN(atr) || isNaN(price) || price === 0) {
             throw new Error(`Invalid data for ${symbol}`);
           }
@@ -60,6 +79,8 @@ function App() {
             atr,
             atrPercent: +(100 * (atr / price)).toFixed(2),
           };
+          */
+          
         } catch (err) {
           console.error(`Error fetching ${symbol}:`, err);
           return {
@@ -83,98 +104,117 @@ function App() {
     }
   };
 
-  const handleThresholdChange = (e) => {
-    const value = parseFloat(e.target.value);
-    setThreshold(value);
-    localStorage.setItem("threshold", String(value));
+  const formatPrice = (price, symbol) => {
+    if (symbol === "BTC/USD") {
+      return price.toLocaleString(undefined, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4
+      });
+    } else if (symbol === "XAU/USD") {
+      return price.toLocaleString(undefined, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4
+      });
+    } else if (symbol === "USD/JPY") {
+      return price.toLocaleString(undefined, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4
+      });
+    } else {
+      return price.toLocaleString(undefined, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4
+      });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <header className="text-center mb-8 pt-8">
-          <h1 className="text-4xl font-bold mb-2 text-cyan-400">
-            📊 Forex + BTC Volatility Monitor
-          </h1>
-          <p className="text-sm text-gray-400">
-            ATR-based volatility alert system using 15-minute candles
-          </p>
-        </header>
-
-        <div className="flex flex-col items-center mb-6">
-          <label className="mb-2 text-sm font-medium">
-            ATR Threshold (%)
-          </label>
-          <input
-            type="number"
-            step="0.1"
-            value={threshold}
-            onChange={handleThresholdChange}
-            className="w-24 text-center bg-gray-700 border border-gray-600 rounded py-1 px-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
-        </div>
-
-        <div className="flex flex-col items-center mb-8">
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <div className="px-4 pt-8 pb-6">
+        <h1 className="text-2xl font-bold text-green-400 mb-8 text-center">
+          Forex + BTC Volatility Monitor
+        </h1>
+        
+        {/* Refresh Button */}
+        <div className="flex justify-center mb-4">
           <button
             onClick={fetchData}
             disabled={loading}
-            className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 transition px-8 py-3 rounded-lg text-white font-semibold mb-4"
+            className="bg-green-400 text-black px-8 py-3 rounded-lg font-semibold disabled:opacity-50"
           >
-            {loading ? "⏳ Loading..." : "🔄 Refresh Now"}
+            {loading ? "Loading..." : "Refresh Now"}
           </button>
-          <p className="text-sm text-gray-300">
-            ⏱ Next auto-refresh in: <span className="font-semibold">{refreshIn}s</span>
-          </p>
+        </div>
+        
+        {/* Timer */}
+        <div className="text-center text-gray-400 mb-6">
+          Next auto-refresh in: <span className="text-white">{refreshIn}s</span>
+        </div>
+      </div>
+
+      {/* Table Header */}
+      <div className="px-4">
+        <div className="grid grid-cols-4 gap-4 pb-4 text-green-400 font-semibold">
+          <div>Ticker</div>
+          <div className="text-right">Price</div>
+          <div className="text-right">Vol %</div>
+          <div className="text-center">Bulbs</div>
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="bg-red-900 border border-red-600 rounded-lg p-4 mb-6 text-center">
-            <p className="text-red-200">{error}</p>
+          <div className="bg-red-900/30 border border-red-600 rounded-lg p-4 mb-4">
+            <p className="text-red-200 text-center">{error}</p>
           </div>
         )}
 
-        {/* Table Layout */}
-        <div className="bg-gray-800 rounded-lg overflow-hidden shadow-xl">
-          <div className="grid grid-cols-4 gap-4 p-4 bg-gray-700 font-semibold text-cyan-400">
-            <div>Ticker</div>
-            <div className="text-right">Price</div>
-            <div className="text-right">Vol %</div>
-            <div className="text-center">Status</div>
-          </div>
-          
+        {/* Data Rows */}
+        <div className="space-y-0">
           {data.length === 0 && !loading ? (
-            <div className="p-8 text-center text-gray-400">
+            <div className="py-8 text-center text-gray-400">
               No data available. Click Refresh Now to load data.
             </div>
           ) : (
             data.map((item, index) => (
               <div 
                 key={item.symbol}
-                className={`grid grid-cols-4 gap-4 p-4 border-b border-gray-700 last:border-b-0 ${
-                  item.error ? 'bg-red-900/20' : 'hover:bg-gray-700/50'
+                className={`grid grid-cols-4 gap-4 py-4 border-b border-gray-800 ${
+                  item.error ? 'text-red-400' : ''
                 }`}
               >
-                <div className="font-semibold text-lg">{item.symbol}</div>
-                <div className="text-right">
-                  {item.error ? 'Error' : item.price.toLocaleString(undefined, {
-                    minimumFractionDigits: item.price < 10 ? 4 : 2,
-                    maximumFractionDigits: item.price < 10 ? 4 : 2
-                  })}
+                <div className="text-white font-medium">{item.symbol}</div>
+                <div className="text-right text-white">
+                  {item.error ? 'Error' : formatPrice(item.price, item.symbol)}
                 </div>
-                <div className="text-right font-bold">
-                  {item.error ? 'N/A' : `${item.atrPercent}%`}
+                <div className="text-right text-white">
+                  {item.error ? 'N/A' : item.atrPercent.toFixed(2)}
                 </div>
-                <div className="text-center text-2xl">
+                <div className="text-center text-xl">
                   {item.error ? '❌' : (item.atrPercent >= threshold ? '🔥' : '💡')}
                 </div>
               </div>
             ))
           )}
         </div>
+      </div>
 
-        <footer className="mt-8 text-center text-xs text-gray-400">
-          🔥 = High Volatility (≥ {threshold}%) | 💡 = Normal Volatility | ❌ = Data Error
-        </footer>
+      {/* Threshold Controls */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 p-4 border-t border-gray-800">
+        <div className="flex items-center justify-center space-x-4">
+          <span className="text-sm text-gray-400">Threshold:</span>
+          <input
+            type="number"
+            step="0.1"
+            value={threshold}
+            onChange={(e) => setThreshold(parseFloat(e.target.value))}
+            className="w-20 text-center bg-gray-800 border border-gray-600 rounded py-1 px-2 text-white focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+          <span className="text-sm text-gray-400">%</span>
+        </div>
+        <div className="text-center text-xs text-gray-500 mt-2">
+          🔥 = High Volatility (≥ {threshold}%) | 💡 = Normal Volatility
+        </div>
       </div>
     </div>
   );
