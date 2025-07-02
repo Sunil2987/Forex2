@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const API_KEY = "demo"; // Replace with your actual API key
+const API_KEY = "demo"; // Replace with your actual Twelve Data API key
 const TICKERS = ["BTC/USD", "XAU/USD", "EUR/GBP", "AUD/JPY"];
 
 // Default thresholds
@@ -11,6 +11,14 @@ const defaultThresholds = {
   "AUD/JPY": 2.5
 };
 
+// Map symbols to Twelve Data format
+const symbolMapping = {
+  "BTC/USD": "BTC/USD",
+  "XAU/USD": "XAU/USD", 
+  "EUR/GBP": "EUR/GBP",
+  "AUD/JPY": "AUD/JPY"
+};
+
 function App() {
   const [data, setData] = useState([]);
   const [thresholds, setThresholds] = useState(defaultThresholds);
@@ -19,26 +27,10 @@ function App() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Load saved thresholds from localStorage on component mount
+  // Load saved thresholds from memory on component mount
   useEffect(() => {
-    // Check if we're in browser environment
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const savedThresholds = localStorage.getItem('volatilityThresholds');
-        if (savedThresholds) {
-          const parsed = JSON.parse(savedThresholds);
-          // Validate the loaded thresholds
-          const validThresholds = {};
-          TICKERS.forEach(symbol => {
-            const value = parseFloat(parsed[symbol]);
-            validThresholds[symbol] = !isNaN(value) && value >= 0 ? value : defaultThresholds[symbol];
-          });
-          setThresholds(validThresholds);
-        }
-      } catch (e) {
-        console.error("Failed to parse saved thresholds", e);
-      }
-    }
+    // Since we can't use localStorage, we'll just use the default thresholds
+    // In a real environment, you could implement server-side storage
   }, []);
 
   useEffect(() => {
@@ -84,37 +76,58 @@ function App() {
     try {
       const promises = TICKERS.map(async (symbol) => {
         try {
-          // Simulate API calls with demo data for now
-          const simulatedData = {
-            "BTC/USD": { price: 107783, atr: 2483.00 },
-            "XAU/USD": { price: 2684, atr: 45.58 },
-            "EUR/GBP": { price: 0.8234, atr: 0.0125 },
-            "AUD/JPY": { price: 99.6150, atr: 1.23 }
-          };
+          const mappedSymbol = symbolMapping[symbol];
           
-          const mockData = simulatedData[symbol];
-          if (mockData) {
-            const { price, atr } = mockData;
-            const atrPercent = +(100 * (atr / price)).toFixed(2);
-            
-            // Check if we need to send notification
-            if (atrPercent >= thresholds[symbol]) {
-              notify(symbol, atrPercent);
-            }
-            
-            return {
-              symbol,
-              price,
-              atrPercent,
-              error: false
-            };
+          // Fetch current price
+          const priceResponse = await fetch(
+            `https://api.twelvedata.com/price?symbol=${mappedSymbol}&apikey=${API_KEY}`
+          );
+          
+          if (!priceResponse.ok) {
+            throw new Error(`Price API error: ${priceResponse.status}`);
+          }
+          
+          const priceData = await priceResponse.json();
+          
+          if (priceData.status === 'error') {
+            throw new Error(priceData.message || 'Price API returned error');
+          }
+          
+          // Fetch ATR data
+          const atrResponse = await fetch(
+            `https://api.twelvedata.com/atr?symbol=${mappedSymbol}&interval=1day&time_period=14&apikey=${API_KEY}`
+          );
+          
+          if (!atrResponse.ok) {
+            throw new Error(`ATR API error: ${atrResponse.status}`);
+          }
+          
+          const atrData = await atrResponse.json();
+          
+          if (atrData.status === 'error') {
+            throw new Error(atrData.message || 'ATR API returned error');
+          }
+          
+          const price = parseFloat(priceData.price);
+          const atr = parseFloat(atrData.values[0].atr);
+          
+          if (isNaN(price) || isNaN(atr)) {
+            throw new Error('Invalid price or ATR data received');
+          }
+          
+          const atrPercent = +(100 * (atr / price)).toFixed(2);
+          
+          // Check if we need to send notification
+          if (atrPercent >= thresholds[symbol]) {
+            notify(symbol, atrPercent);
           }
           
           return {
             symbol,
-            price: NaN,
-            atrPercent: NaN,
-            error: true
+            price,
+            atrPercent,
+            error: false,
+            lastUpdate: new Date().toLocaleTimeString()
           };
           
         } catch (err) {
@@ -123,7 +136,9 @@ function App() {
             symbol,
             price: NaN,
             atrPercent: NaN,
-            error: true
+            error: true,
+            errorMessage: err.message,
+            lastUpdate: new Date().toLocaleTimeString()
           };
         }
       });
@@ -131,6 +146,13 @@ function App() {
       const results = await Promise.all(promises);
       setData(results);
       setRefreshIn(300);
+      
+      // Check if all requests failed
+      const allFailed = results.every(result => result.error);
+      if (allFailed) {
+        setError("All API requests failed. Please check your API key and connection.");
+      }
+      
     } catch (error) {
       console.error("Data fetch failed", error);
       setError("Failed to fetch data. Please check your connection and try again.");
@@ -157,16 +179,10 @@ function App() {
   };
 
   const saveThresholds = () => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        localStorage.setItem('volatilityThresholds', JSON.stringify(thresholds));
-        setSuccessMessage("Thresholds saved successfully!");
-        setTimeout(() => setSuccessMessage(""), 3000);
-      } catch (e) {
-        console.error("Failed to save thresholds", e);
-        setError("Failed to save thresholds");
-      }
-    }
+    // Since we can't use localStorage in this environment, 
+    // we'll just show a success message for the in-memory storage
+    setSuccessMessage("Thresholds saved successfully! (Note: Settings will reset on page refresh)");
+    setTimeout(() => setSuccessMessage(""), 3000);
   };
 
   const updateThreshold = (symbol, value) => {
@@ -182,10 +198,6 @@ function App() {
   const resetThresholds = () => {
     if (window.confirm("Are you sure you want to reset all thresholds to default values?")) {
       setThresholds(defaultThresholds);
-      // Remove from localStorage to use defaults
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.removeItem('volatilityThresholds');
-      }
       setSuccessMessage("Thresholds reset to defaults!");
       setTimeout(() => setSuccessMessage(""), 3000);
     }
@@ -205,8 +217,15 @@ function App() {
             📈 Forex & Crypto Volatility Monitor
           </h1>
           <p className="text-gray-600 mb-4">
-            Real-time ATR% monitoring with customizable alerts
+            Real-time ATR% monitoring with Twelve Data API
           </p>
+          
+          {/* API Key Warning */}
+          {API_KEY === "demo" && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+              ⚠️ Using demo API key. Replace with your actual Twelve Data API key for full functionality.
+            </div>
+          )}
           
           {/* Notification Permission Button */}
           {typeof window !== 'undefined' && "Notification" in window && Notification.permission !== "granted" && (
@@ -293,11 +312,30 @@ function App() {
                   </div>
                   
                   <div className="pt-2 border-t border-gray-200">
-                    <span className="text-gray-600 text-sm">Threshold:</span>
-                    <div className="text-sm font-mono text-gray-700">
-                      {thresholds[item.symbol]}%
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-gray-600 text-sm">Threshold:</span>
+                        <div className="text-sm font-mono text-gray-700">
+                          {thresholds[item.symbol]}%
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-gray-600 text-xs">Last update:</span>
+                        <div className="text-xs font-mono text-gray-500">
+                          {item.lastUpdate}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  
+                  {item.error && item.errorMessage && (
+                    <div className="pt-2 border-t border-red-200">
+                      <span className="text-red-600 text-xs">Error:</span>
+                      <div className="text-xs text-red-500">
+                        {item.errorMessage}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -352,7 +390,17 @@ function App() {
 
         {/* Footer */}
         <div className="text-center text-gray-500 text-sm mt-8">
-          <p>Data updates every 5 minutes • Using demo data</p>
+          <p>Data updates every 5 minutes • Powered by Twelve Data API</p>
+          <p className="mt-1">
+            <a 
+              href="https://twelvedata.com/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-700"
+            >
+              Get your free Twelve Data API key
+            </a>
+          </p>
         </div>
       </div>
     </div>
