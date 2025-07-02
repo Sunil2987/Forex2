@@ -4,16 +4,9 @@ import axios from "axios";
 const API_KEY = import.meta.env.VITE_TWELVE_API_KEY;
 const TICKERS = ["BTC/USD", "XAU/USD", "USD/JPY", "GBP/CAD", "EUR/USD"];
 
-interface TickerData {
-  symbol: string;
-  price: number;
-  atr: number;
-  atrPercent: number;
-};
-
 function App() {
-  const [data, setData] = useState<TickerData[]>([]);
-  const [threshold, setThreshold] = useState<number>(
+  const [data, setData] = useState([]);
+  const [threshold, setThreshold] = useState(
     Number(localStorage.getItem("threshold")) || 1.5
   );
   const [refreshIn, setRefreshIn] = useState(300);
@@ -56,7 +49,7 @@ function App() {
     }
   };
 
-  const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThresholdChange = (e) => {
     const value = parseFloat(e.target.value);
     setThreshold(value);
     localStorage.setItem("threshold", String(value));
