@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const API_KEY = "demo"; // Replace with your actual Twelve Data API key
+const API_KEY = "495fa3a802b3498e96b09e7092ab0839"; // Replace with your actual Twelve Data API key
 const TICKERS = ["BTC/USD", "XAU/USD", "EUR/GBP", "AUD/JPY"];
 
 // Default thresholds
