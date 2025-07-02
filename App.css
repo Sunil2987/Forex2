@@ -8,7 +8,8 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden; /* Changed from overflow: hidden to allow vertical scroll */
+  overflow-y: auto;
 }
 
 /* Container with subtle glowing animation */
@@ -25,11 +26,12 @@ body {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   cursor: default;
   position: relative;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to visible */
+  margin: 2rem auto; /* Added margin for spacing */
 }
 
 .app:hover {
-  transform: scale(1.04);
+  transform: scale(1.02); /* Reduced scale to prevent overflow issues */
   box-shadow:
     0 0 40px rgba(0, 255, 200, 0.5),
     0 0 70px rgba(0, 255, 200, 0.2);
@@ -77,12 +79,12 @@ body {
 
 .refresh-btn:hover {
   background: linear-gradient(135deg, #00e6b8, #00a88f);
-  transform: translateY(-5px);
-  box-shadow: 0 15px 25px rgba(0, 255, 204, 0.6);
+  transform: translateY(-3px); /* Reduced transform to prevent layout issues */
+  box-shadow: 0 12px 20px rgba(0, 255, 204, 0.6); /* Adjusted shadow */
 }
 
 .refresh-btn:active {
-  transform: translateY(-2px);
+  transform: translateY(-1px); /* Reduced transform */
   box-shadow: 0 8px 15px rgba(0, 255, 204, 0.3);
 }
 
@@ -100,7 +102,7 @@ body {
   font-weight: 500;
   letter-spacing: 0.8px;
   user-select: none;
-  text-shadow: 0 0 8px #00998844;
+  text-shadow: 0 0 8px rgba(0, 153, 136, 0.3); /* Fixed rgba syntax */
 }
 
 /* Loading & error with fade-in effect */
@@ -127,29 +129,43 @@ body {
 .error {
   color: #ff5f5f;
   font-weight: 600;
-  text-shadow: 0 0 6px #ff4c4caa;
+  text-shadow: 0 0 6px rgba(255, 76, 76, 0.7); /* Fixed rgba syntax */
+}
+
+/* Success message styling - added */
+.success {
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 1rem;
+  color: #00ff88;
+  font-weight: 600;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.7);
+  animation: fadeInUp 0.5s ease forwards;
+  user-select: none;
 }
 
 /* Table enhancements */
 .volatility-table {
   width: 100%;
-  border-collapse: separate; /* enable border-spacing */
-  border-spacing: 0 12px; /* vertical spacing between rows */
+  border-collapse: separate;
+  border-spacing: 0 8px; /* Reduced spacing to prevent overflow */
   background: transparent;
   border-radius: 14px;
   overflow: hidden;
   user-select: none;
+  margin-bottom: 1rem; /* Added margin */
 }
 
 .volatility-table th,
 .volatility-table td {
-  padding: 1.25rem 1rem;
+  padding: 1rem 0.8rem; /* Reduced padding */
   text-align: center;
   background: rgba(255, 255, 255, 0.08);
   border: none;
   transition: background-color 0.3s ease;
   font-weight: 500;
   color: #00ffcc;
+  font-size: 0.95rem; /* Added font size */
 }
 
 .volatility-table th {
@@ -159,7 +175,7 @@ body {
   color: #00ffcc;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  box-shadow: inset 0 -3px 0 0 #00ffccaa;
+  box-shadow: inset 0 -3px 0 0 rgba(0, 255, 204, 0.7); /* Fixed rgba syntax */
 }
 
 .volatility-table tbody tr:hover:not(.alert-row) td {
@@ -169,40 +185,163 @@ body {
   font-weight: 600;
 }
 
-.alert-row {
-  background-color: rgba(255, 0, 0, 0.35);
+.alert-row td {
+  background-color: rgba(255, 100, 100, 0.25) !important; /* Made more subtle and added !important */
   font-weight: bold;
-  color: #ff5f5f;
+  color: #ff8888 !important; /* Made less harsh */
   text-shadow:
-    0 0 8px #ff4444aa,
-    0 0 12px #ff2222cc;
+    0 0 8px rgba(255, 68, 68, 0.7),
+    0 0 12px rgba(255, 34, 34, 0.8); /* Fixed rgba syntax */
 }
 
-/* Add smooth scroll on table container if needed */
-.app > .table-container {
-  max-height: 350px;
+/* Table container for scrolling */
+.table-container {
+  max-height: 400px; /* Increased height */
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #00ffcc44 transparent;
+  scrollbar-color: rgba(0, 255, 204, 0.3) transparent; /* Fixed rgba syntax */
   border-radius: 14px;
+  margin-bottom: 1rem;
 }
 
 /* Custom scrollbar for WebKit */
-.app > .table-container::-webkit-scrollbar {
+.table-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.app > .table-container::-webkit-scrollbar-thumb {
-  background-color: #00ffcc77;
+.table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 255, 204, 0.5); /* Fixed rgba syntax */
   border-radius: 10px;
   transition: background-color 0.3s ease;
 }
 
-.app > .table-container::-webkit-scrollbar-thumb:hover {
-  background-color: #00ffccaa;
+.table-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 255, 204, 0.7); /* Fixed rgba syntax */
+}
+
+/* Input and form styling - added for threshold inputs */
+.threshold-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 8px;
+  padding: 0.5rem;
+  color: #eaeaea;
+  font-size: 0.9rem;
+  width: 80px;
+  text-align: center;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.threshold-input:focus {
+  outline: none;
+  border-color: #00ffcc;
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
+}
+
+/* Settings section */
+.settings-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0, 255, 204, 0.2);
+}
+
+.settings-title {
+  color: #00ffcc;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(0, 255, 208, 0.5);
+}
+
+.threshold-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.threshold-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.threshold-label {
+  color: #99cccc;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Button group */
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.save-btn,
+.reset-btn {
+  padding: 0.7rem 1.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.save-btn {
+  background: linear-gradient(135deg, #00ff88, #00cc70);
+  color: #000;
+  box-shadow: 0 6px 12px rgba(0, 255, 136, 0.3);
+}
+
+.save-btn:hover {
+  background: linear-gradient(135deg, #00e675, #00b565);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 255, 136, 0.5);
+}
+
+.reset-btn {
+  background: linear-gradient(135deg, #666, #555);
+  color: #eaeaea;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.reset-btn:hover {
+  background: linear-gradient(135deg, #777, #666);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
 }
 
 /* Responsive tweaks */
+@media (max-width: 768px) {
+  body {
+    align-items: flex-start; /* Changed to flex-start for mobile */
+    padding: 1rem 0; /* Added padding */
+  }
+  
+  .app {
+    width: 95%;
+    padding: 1.5rem;
+    margin: 1rem auto;
+    transform: none !important; /* Disable hover transform on mobile */
+  }
+  
+  .app:hover {
+    transform: none !important;
+  }
+}
+
 @media (max-width: 600px) {
   .header {
     font-size: 1.75rem;
@@ -220,6 +359,20 @@ body {
   .volatility-table th,
   .volatility-table td {
     padding: 0.7rem 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+  }
+  
+  .threshold-controls {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .button-group {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .save-btn,
+  .reset-btn {
+    width: 200px;
   }
 }
