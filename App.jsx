@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -10,7 +9,7 @@ interface TickerData {
   price: number;
   atr: number;
   atrPercent: number;
-};
+}
 
 function App() {
   const [data, setData] = useState<TickerData[]>([]);
@@ -22,7 +21,7 @@ function App() {
   useEffect(() => {
     fetchData();
     const timer = setInterval(() => setRefreshIn((t) => (t > 0 ? t - 1 : 0)), 1000);
-    const refresh = setInterval(() => fetchData(), 300000); // 5 min
+    const refresh = setInterval(() => fetchData(), 300000);
     return () => {
       clearInterval(timer);
       clearInterval(refresh);
@@ -64,60 +63,72 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white px-4 py-6">
-      <h1 className="text-2xl font-bold mb-2 text-center">
-        Forex + BTC Volatility Monitor
-      </h1>
-      <p className="text-center mb-4">
-        ATR Threshold:{" "}
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
+      <header className="text-center mb-6">
+        <h1 className="text-3xl font-bold mb-2">📊 Forex + BTC Volatility Monitor</h1>
+        <p className="text-sm text-gray-400">
+          ATR-based volatility alert system using 15-minute candles
+        </p>
+      </header>
+
+      <section className="flex flex-col items-center mb-4">
+        <label className="mb-2 text-sm font-medium">
+          ATR Threshold (%)
+        </label>
         <input
           type="number"
-          className="bg-gray-800 border px-2 py-1 rounded w-20 text-white text-center"
+          step="0.1"
           value={threshold}
           onChange={handleThresholdChange}
-          step="0.1"
-        />{" "}
-        %
-      </p>
-      <button
-        onClick={fetchData}
-        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded mb-4 block mx-auto"
-      >
-        Refresh Now
-      </button>
-      <p className="text-center text-sm mb-2">Next auto-refresh in: {refreshIn}s</p>
+          className="w-24 text-center bg-gray-700 border border-gray-600 rounded py-1 px-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="flex flex-col items-center mb-4">
+        <button
+          onClick={fetchData}
+          className="bg-blue-600 hover:bg-blue-700 transition px-5 py-2 rounded text-white font-semibold mb-2"
+        >
+          🔄 Refresh Now
+        </button>
+        <p className="text-sm text-gray-300">
+          ⏱ Next auto-refresh in: <span className="font-semibold">{refreshIn}s</span>
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((item) => (
           <div
             key={item.symbol}
-            className={`p-4 rounded shadow-md ${
-              item.atrPercent >= threshold ? "bg-red-700" : "bg-gray-800"
+            className={`rounded-xl p-4 transition-all duration-300 shadow-lg border ${
+              item.atrPercent >= threshold
+                ? "bg-red-700 border-red-400"
+                : "bg-gray-800 border-gray-700"
             }`}
           >
-            <h2 className="text-lg font-semibold">{item.symbol}</h2>
-            <p>Price: {item.price.toLocaleString()}</p>
-            <p>ATR: {item.atr.toFixed(2)}</p>
-            <p>
-              ATR %:{" "}
+            <h2 className="text-xl font-semibold mb-1">{item.symbol}</h2>
+            <p className="text-sm">💰 Price: {item.price.toLocaleString()}</p>
+            <p className="text-sm">📈 ATR: {item.atr.toFixed(2)}</p>
+            <p className="text-sm">
+              📊 ATR %:{" "}
               <span
-                className={
-                  item.atrPercent >= threshold ? "text-yellow-300 font-bold" : ""
-                }
+                className={`font-bold ${
+                  item.atrPercent >= threshold ? "text-yellow-300" : "text-gray-300"
+                }`}
               >
                 {item.atrPercent}%
               </span>
             </p>
-            <p className="text-xl mt-2">
+            <div className="text-3xl mt-3 text-center">
               {item.atrPercent >= threshold ? "🔥" : "💡"}
-            </p>
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="text-xs text-gray-400 mt-6 text-center">
+      <footer className="mt-8 text-center text-xs text-gray-400">
         🔥 = High Volatility (≥ {threshold}%) | 💡 = Normal Volatility
-      </div>
+      </footer>
     </div>
   );
 }
