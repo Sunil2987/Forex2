@@ -1,61 +1,118 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #0d0d0d;
+  background: linear-gradient(135deg, #0d0d0d 0%, #001f1f 100%);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #eaeaea;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  overflow: hidden; /* Prevent scrolling */
+  overflow: hidden;
 }
 
+/* Container with subtle glowing animation */
 .app {
   background: rgba(20, 20, 20, 0.95);
-  padding: 2rem;
+  padding: 2rem 2.5rem;
   border-radius: 1.5rem;
-  box-shadow: 0 0 25px rgba(0, 255, 200, 0.3); /* Enhanced shadow */
-  backdrop-filter: blur(15px); /* Increased blur for depth */
-  width: 90%; /* Adjusted for better mobile fit */
+  box-shadow:
+    0 0 25px rgba(0, 255, 200, 0.3),
+    0 0 50px rgba(0, 255, 200, 0.15);
+  backdrop-filter: blur(20px);
+  width: 90%;
   max-width: 700px;
-  transition: transform 0.3s ease; /* Smooth scaling effect */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: default;
+  position: relative;
+  overflow: hidden;
 }
 
 .app:hover {
-  transform: scale(1.02); /* Slightly enlarge on hover */
+  transform: scale(1.04);
+  box-shadow:
+    0 0 40px rgba(0, 255, 200, 0.5),
+    0 0 70px rgba(0, 255, 200, 0.2);
+}
+
+/* Subtle floating animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 .header {
   text-align: center;
   color: #00ffcc;
-  font-size: 2rem; /* Increased font size for better visibility */
+  font-size: 2.25rem;
   margin-bottom: 1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  animation: float 4s ease-in-out infinite;
+  text-shadow:
+    0 0 8px #00ffd0,
+    0 0 15px #00ddb0;
 }
 
 .refresh-btn {
   display: block;
-  margin: 0 auto 1rem;
-  padding: 0.75rem 2rem; /* Increased padding for better touch targets */
-  font-size: 1.1rem; /* Slightly larger font size */
-  background-color: #00ffcc;
+  margin: 0 auto 1.5rem;
+  padding: 0.85rem 2.5rem;
+  font-size: 1.15rem;
+  background: linear-gradient(135deg, #00ffcc, #00bfa0);
   color: #000;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease; /* Added transform transition */
+  box-shadow: 0 8px 15px rgba(0, 255, 204, 0.3);
+  transition: background 0.3s ease, transform 0.25s ease, box-shadow 0.3s ease;
+  font-weight: 600;
+  user-select: none;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
 }
 
 .refresh-btn:hover {
-  background-color: #00e6b8;
-  transform: translateY(-2px); /* Lift effect on hover */
+  background: linear-gradient(135deg, #00e6b8, #00a88f);
+  transform: translateY(-5px);
+  box-shadow: 0 15px 25px rgba(0, 255, 204, 0.6);
+}
+
+.refresh-btn:active {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0, 255, 204, 0.3);
+}
+
+/* Add focus outline for accessibility */
+.refresh-btn:focus-visible {
+  outline: 3px solid #00ffd0;
+  outline-offset: 3px;
 }
 
 .countdown {
   text-align: center;
-  font-size: 1.2rem; /* Increased font size for better visibility */
-  margin-bottom: 1rem;
-  color: #aaa;
+  font-size: 1.3rem;
+  margin-bottom: 1.5rem;
+  color: #99cccc;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  user-select: none;
+  text-shadow: 0 0 8px #00998844;
+}
+
+/* Loading & error with fade-in effect */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  } 
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .loading,
@@ -63,52 +120,106 @@ body {
   text-align: center;
   margin: 1rem 0;
   font-size: 1rem;
+  animation: fadeInUp 0.5s ease forwards;
+  user-select: none;
 }
 
+.error {
+  color: #ff5f5f;
+  font-weight: 600;
+  text-shadow: 0 0 6px #ff4c4caa;
+}
+
+/* Table enhancements */
 .volatility-table {
   width: 100%;
-  border-collapse: collapse;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  border-collapse: separate; /* enable border-spacing */
+  border-spacing: 0 12px; /* vertical spacing between rows */
+  background: transparent;
+  border-radius: 14px;
   overflow: hidden;
+  user-select: none;
 }
 
 .volatility-table th,
 .volatility-table td {
-  padding: 1rem; /* Increased padding for better readability */
+  padding: 1.25rem 1rem;
   text-align: center;
-  border-bottom: 1px solid #222;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+  color: #00ffcc;
 }
 
 .volatility-table th {
+  font-weight: 700;
+  font-size: 1rem;
   background-color: #111;
   color: #00ffcc;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  box-shadow: inset 0 -3px 0 0 #00ffccaa;
+}
+
+.volatility-table tbody tr:hover:not(.alert-row) td {
+  background-color: rgba(0, 255, 204, 0.12);
+  cursor: default;
+  color: #00ffd7;
   font-weight: 600;
 }
 
 .alert-row {
-  background-color: rgba(255, 0, 0, 0.25); /* More pronounced alert color */
+  background-color: rgba(255, 0, 0, 0.35);
   font-weight: bold;
   color: #ff5f5f;
+  text-shadow:
+    0 0 8px #ff4444aa,
+    0 0 12px #ff2222cc;
 }
 
-/* Responsive Design */
+/* Add smooth scroll on table container if needed */
+.app > .table-container {
+  max-height: 350px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #00ffcc44 transparent;
+  border-radius: 14px;
+}
+
+/* Custom scrollbar for WebKit */
+.app > .table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.app > .table-container::-webkit-scrollbar-thumb {
+  background-color: #00ffcc77;
+  border-radius: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.app > .table-container::-webkit-scrollbar-thumb:hover {
+  background-color: #00ffccaa;
+}
+
+/* Responsive tweaks */
 @media (max-width: 600px) {
   .header {
-    font-size: 1.5rem; /* Adjust header size for smaller screens */
+    font-size: 1.75rem;
   }
 
   .refresh-btn {
-    padding: 0.5rem 1rem; /* Adjust button padding for smaller screens */
-    font-size: 1rem; /* Adjust button font size */
+    padding: 0.6rem 1.5rem;
+    font-size: 1rem;
   }
 
   .countdown {
-    font-size: 1rem; /* Adjust countdown font size */
+    font-size: 1.1rem;
   }
 
   .volatility-table th,
   .volatility-table td {
-    padding: 0.5rem; /* Adjust table cell padding */
+    padding: 0.7rem 0.5rem;
+    font-size: 0.9rem;
   }
 }
