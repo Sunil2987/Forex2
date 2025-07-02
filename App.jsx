@@ -1,23 +1,19 @@
-```jsx
 import React, { useState, useEffect } from "react";
 
 const API_KEY = "demo"; // Replace with your actual API key
 const TICKERS = ["BTC/USD", "XAU/USD", "EUR/GBP", "AUD/JPY"];
 
-// Load thresholds from localStorage or use defaults
-const loadThresholds = () => {
-  const saved = localStorage.getItem('volatilityThresholds');
-  return saved ? JSON.parse(saved) : {
-    "BTC/USD": 2.5,
-    "XAU/USD": 2.5,
-    "EUR/GBP": 2.5,
-    "AUD/JPY": 2.5
-  };
+// Default thresholds
+const defaultThresholds = {
+  "BTC/USD": 2.5,
+  "XAU/USD": 2.5,
+  "EUR/GBP": 2.5,
+  "AUD/JPY": 2.5
 };
 
 function App() {
   const [data, setData] = useState([]);
-  const [thresholds, setThresholds] = useState(loadThresholds());
+  const [thresholds, setThresholds] = useState(defaultThresholds);
   const [refreshIn, setRefreshIn] = useState(300);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,15 +35,18 @@ function App() {
       return;
     }
 
+    const alertTitle = `High Volatility Alert: ${symbol}`;
+    const alertBody = `ATR% reached ${atrPercent.toFixed(2)}%, exceeding your threshold of ${thresholds[symbol]}%.`;
+
     if (Notification.permission === "granted") {
-      new Notification(`High Volatility Alert: ${symbol}`, {
-        body: `ATR% reached ${atrPercent.toFixed(2)}%, exceeding your threshold of ${thresholds[symbol]}%.`
+      new Notification(alertTitle, {
+        body: alertBody
       });
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission().then(permission => {
         if (permission === "granted") {
-          new Notification(`High Volatility Alert: ${symbol}`, {
-            body: `ATR% reached ${atrPercent.toFixed(2)}%, exceeding your threshold of ${thresholds[symbol]}%.`
+          new Notification(alertTitle, {
+            body: alertBody
           });
         }
       });
@@ -129,7 +128,6 @@ function App() {
   };
 
   const saveThresholds = () => {
-    localStorage.setItem('volatilityThresholds', JSON.stringify(thresholds));
     setSuccessMessage("Thresholds saved successfully!");
     setTimeout(() => setSuccessMessage(""), 3000);
   };
@@ -146,14 +144,7 @@ function App() {
 
   const resetThresholds = () => {
     if (window.confirm("Are you sure you want to reset all thresholds to default values?")) {
-      const defaults = {
-        "BTC/USD": 2.5,
-        "XAU/USD": 2.5,
-        "EUR/GBP": 2.5,
-        "AUD/JPY": 2.5
-      };
-      setThresholds(defaults);
-      localStorage.setItem('volatilityThresholds', JSON.stringify(defaults));
+      setThresholds(defaultThresholds);
       setSuccessMessage("Thresholds reset to defaults!");
       setTimeout(() => setSuccessMessage(""), 3000);
     }
@@ -345,9 +336,11 @@ function App() {
       
       {/* Footer */}
       <div className="mt-8 text-center text-xs text-gray-600">
-        <p>Thresholds are saved in your browser's local storage</p>
+        <p>Thresholds are saved in component state during this session</p>
         <p className="mt-1">Notifications will alert you when ATR% exceeds your set thresholds</p>
       </div>
     </div>
   );
 }
+
+export default App;
