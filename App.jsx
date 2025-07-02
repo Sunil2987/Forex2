@@ -9,7 +9,7 @@ interface TickerData {
   price: number;
   atr: number;
   atrPercent: number;
-}
+};
 
 function App() {
   const [data, setData] = useState<TickerData[]>([]);
