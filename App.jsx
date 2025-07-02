@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 
 const API_KEY = import.meta.env.VITE_TWELVE_API_KEY;
 const TICKERS = ["BTC/USD", "XAU/USD", "USD/JPY", "GBP/CAD", "EUR/USD"];
@@ -25,14 +24,20 @@ function App() {
     try {
       const promises = TICKERS.map(async (symbol) => {
         const [base, quote] = symbol.split("/");
-        const response = await axios.get(
+        
+        const atrResponse = await fetch(
           `https://api.twelvedata.com/atr?symbol=${base}${quote}&interval=15min&apikey=${API_KEY}`
         );
-        const priceResp = await axios.get(
+        const atrData = await atrResponse.json();
+        
+        const priceResponse = await fetch(
           `https://api.twelvedata.com/price?symbol=${base}${quote}&apikey=${API_KEY}`
         );
-        const atr = parseFloat(response.data.value);
-        const price = parseFloat(priceResp.data.price);
+        const priceData = await priceResponse.json();
+        
+        const atr = parseFloat(atrData.value);
+        const price = parseFloat(priceData.price);
+        
         return {
           symbol,
           price,
