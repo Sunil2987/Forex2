@@ -276,54 +276,62 @@ function App() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ATR%</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">24h Change</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Volatility</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Threshold</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Update</th>
+                    <th className="px-8 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Symbol</th>
+                    <th className="px-8 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">ATR%</th>
+                    <th className="px-8 py-4 text-right text-sm font-semibold text-gray-700 uppercase tracking-wider">Price</th>
+                    <th className="px-8 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">24h Change</th>
+                    <th className="px-8 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {data.map((item) => {
                     const volatility = getVolatilityStatus(item.atrPercent, thresholds[item.symbol]);
                     return (
-                      <tr key={item.symbol} className={`hover:bg-gray-50 ${volatility.bg}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.symbol}</div>
+                      <tr key={item.symbol} className={`hover:bg-gray-50 ${volatility.bg} border-b border-gray-100`}>
+                        <td className="px-8 py-6 whitespace-nowrap">
+                          <div className="text-lg font-bold text-gray-900">{item.symbol}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`text-sm font-mono font-bold ${volatility.color}`}>
+                        <td className="px-8 py-6 whitespace-nowrap text-center">
+                          <div className={`text-xl font-bold ${volatility.color}`}>
                             {item.error ? 'Error' : `${item.atrPercent}%`}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-mono text-gray-900">
+                        <td className="px-8 py-6 whitespace-nowrap text-right">
+                          <div className="text-lg font-mono font-semibold text-gray-900">
                             {formatPrice(item.symbol, item.price)}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`text-sm font-mono ${item.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <td className="px-8 py-6 whitespace-nowrap text-center">
+                          <div className={`text-lg font-bold ${item.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {item.error ? 'Error' : `${item.change >= 0 ? '+' : ''}${item.change}%`}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${volatility.color.replace('text-', 'bg-').replace('600', '100')} ${volatility.color}`}>
+                        <td className="px-8 py-6 whitespace-nowrap text-center">
+                          <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold ${volatility.color.replace('text-', 'bg-').replace('600', '100')} ${volatility.color}`}>
                             {volatility.icon} {volatility.status}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{thresholds[item.symbol]}%</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{item.lastUpdate}</div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+            
+            {/* Table Footer with Additional Info */}
+            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200">
+              <div className="flex flex-wrap justify-between items-center gap-4">
+                <div className="flex flex-wrap gap-6">
+                  {data.map((item) => (
+                    <div key={item.symbol} className="text-sm text-gray-600">
+                      <span className="font-medium">{item.symbol}</span> threshold: {thresholds[item.symbol]}%
+                    </div>
+                  ))}
+                </div>
+                <div className="text-sm text-gray-500">
+                  Last updated: {data.length > 0 ? data[0].lastUpdate : 'N/A'}
+                </div>
+              </div>
             </div>
           </div>
         ) : (
